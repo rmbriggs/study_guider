@@ -1,5 +1,6 @@
 import { api, setAuthToken } from './client'
 
+export { setAuthToken }
 const STORAGE_KEY = 'study_guider_token'
 
 export async function login(email, password) {
