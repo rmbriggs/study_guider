@@ -7,7 +7,13 @@ settings = get_settings()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+# bcrypt truncates at 72 bytes; reject longer to avoid undefined behavior/crashes
+BCRYPT_MAX_BYTES = 72
+
+
 def hash_password(password: str) -> str:
+    if len(password.encode("utf-8")) > BCRYPT_MAX_BYTES:
+        raise ValueError("Password too long")
     return pwd_context.hash(password)
 
 
