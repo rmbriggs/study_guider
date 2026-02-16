@@ -33,7 +33,7 @@ export default function Register() {
       login(data.user)
       navigate('/')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Registration failed. Check your connection and try again.'))
+      setError(getApiErrorMessage(err, 'Registration failed. Make sure the backend is running (port 8000). See README for how to start it.'))
     } finally {
       setLoading(false)
     }

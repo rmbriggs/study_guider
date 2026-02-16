@@ -28,13 +28,15 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ### Frontend
 
+Start the backend first (see above), then:
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The dev server proxies `/api` to the backend.
+Open http://localhost:5173. The dev server proxies `/api` to the backend. If you run the frontend without the dev server, set `VITE_API_URL=http://127.0.0.1:8000/api` so the app can reach the API.
 
 ## Usage
 

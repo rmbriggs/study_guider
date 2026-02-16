@@ -1,6 +1,7 @@
 import axios from 'axios'
 
-const API_BASE = '/api'
+// Use VITE_API_URL when set (e.g. when not using Vite proxy); otherwise rely on proxy to backend
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api'
 
 export const api = axios.create({
   baseURL: API_BASE,
