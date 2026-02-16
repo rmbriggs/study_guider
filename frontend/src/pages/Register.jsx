@@ -2,27 +2,38 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { register as apiRegister } from '../api/auth'
+import { getApiErrorMessage } from '../utils/apiError'
 import Button from '../components/Button'
 import Input from '../components/Input'
 
+const SIGNUP_FIELDS = [
+  { name: 'email', label: 'Email', type: 'email', placeholder: 'you@example.com', autoComplete: 'email', required: true },
+  { name: 'password', label: 'Password', type: 'password', placeholder: '••••••••', autoComplete: 'new-password', required: true },
+]
+
+const initialFormData = Object.fromEntries(SIGNUP_FIELDS.map((f) => [f.name, '']))
+
 export default function Register() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [formData, setFormData] = useState(initialFormData)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+
+  const updateField = (name, value) => {
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      const data = await apiRegister(email, password)
+      const data = await apiRegister(formData.email, formData.password)
       login(data.user)
       navigate('/')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed')
+      setError(getApiErrorMessage(err, 'Registration failed. Check your connection and try again.'))
     } finally {
       setLoading(false)
     }
@@ -34,26 +45,19 @@ export default function Register() {
         <h1 className="section-title" style={{ fontSize: 24, marginBottom: 8 }}>Sign up</h1>
         <p className="section-subtitle" style={{ marginBottom: 24 }}>Create an account to save your study guides.</p>
         <form onSubmit={handleSubmit}>
-          <Input
-            label="Email"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-            style={{ marginBottom: 16 }}
-          />
-          <Input
-            label="Password"
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="new-password"
-            style={{ marginBottom: 24 }}
-          />
+          {SIGNUP_FIELDS.map((field, index) => (
+            <Input
+              key={field.name}
+              label={field.label}
+              type={field.type}
+              placeholder={field.placeholder}
+              value={formData[field.name]}
+              onChange={(e) => updateField(field.name, e.target.value)}
+              required={field.required}
+              autoComplete={field.autoComplete}
+              style={{ marginBottom: index === SIGNUP_FIELDS.length - 1 ? 24 : 16 }}
+            />
+          ))}
           {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
           <Button type="submit" disabled={loading} style={{ width: '100%' }}>
             {loading ? 'Creating account…' : 'Sign up'}

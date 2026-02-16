@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { login as apiLogin } from '../api/auth'
+import { getApiErrorMessage } from '../utils/apiError'
 import Button from '../components/Button'
 import Input from '../components/Input'
 
@@ -22,7 +23,7 @@ export default function Login() {
       login(data.user)
       navigate('/')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed')
+      setError(getApiErrorMessage(err, 'Login failed. Check your connection and try again.'))
     } finally {
       setLoading(false)
     }
