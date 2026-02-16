@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
     if (token) {
       setAuthToken(token)
       api.get('/auth/me').then(({ data }) => {
-        setUser(data) // { id, email }
+        setUser(data) // { id, username, email }
       }).catch(() => {
         apiLogout()
         setUser(null)
@@ -24,13 +24,14 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = (userData) => setUser(userData?.user ?? userData)
+  const updateUser = (userData) => setUser(userData)
   const logout = () => {
     apiLogout()
     setUser(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

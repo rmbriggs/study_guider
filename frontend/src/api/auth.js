@@ -11,11 +11,17 @@ export async function login(email, password) {
   return data
 }
 
-export async function register(email, password) {
-  const { data } = await api.post('/auth/register', { email, password })
+export async function register(email, password, username) {
+  const { data } = await api.post('/auth/register', { email, password, username })
   const token = data.access_token
   localStorage.setItem(STORAGE_KEY, token)
   setAuthToken(token)
+  return data
+}
+
+/** Update the current user's username. Returns updated user. */
+export async function updateUsername(username) {
+  const { data } = await api.patch('/auth/me', { username })
   return data
 }
 

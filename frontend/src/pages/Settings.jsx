@@ -1,21 +1,48 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { deleteAccount } from '../api/auth'
+import { deleteAccount, updateUsername } from '../api/auth'
 import { getApiErrorMessage } from '../utils/apiError'
 import Button from '../components/Button'
+import Input from '../components/Input'
 
 const CONFIRM_PHRASE = 'delete'
 
 export default function Settings() {
-  const { user, logout } = useAuth()
+  const { user, logout, updateUser } = useAuth()
   const navigate = useNavigate()
   const [confirmText, setConfirmText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [usernameValue, setUsernameValue] = useState(user?.username ?? '')
+  const [usernameLoading, setUsernameLoading] = useState(false)
+  const [usernameError, setUsernameError] = useState('')
+  const [usernameSuccess, setUsernameSuccess] = useState(false)
+
+  useEffect(() => {
+    if (user?.username != null) setUsernameValue(user.username)
+  }, [user?.username])
 
   const isConfirmValid = confirmText.trim().toLowerCase() === CONFIRM_PHRASE
+  const usernameChanged = usernameValue.trim() !== (user?.username ?? '')
+
+  const handleUsernameSubmit = async (e) => {
+    e.preventDefault()
+    if (!usernameChanged || usernameLoading) return
+    setUsernameError('')
+    setUsernameSuccess(false)
+    setUsernameLoading(true)
+    try {
+      const updated = await updateUsername(usernameValue.trim())
+      updateUser(updated)
+      setUsernameSuccess(true)
+    } catch (err) {
+      setUsernameError(getApiErrorMessage(err, 'Failed to update username'))
+    } finally {
+      setUsernameLoading(false)
+    }
+  }
 
   const handleDelete = async (e) => {
     e.preventDefault()
@@ -46,16 +73,35 @@ export default function Settings() {
             className="nav-avatar"
             style={{ width: 48, height: 48, fontSize: 18 }}
           >
-            {user?.email?.slice(0, 2).toUpperCase()}
+            {(user?.username || user?.email)?.slice(0, 2).toUpperCase()}
           </div>
           <div>
             <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Profile</h2>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{user?.email}</p>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{'@'}{user?.username} · {user?.email}</p>
             {user?.email_verified && (
               <span style={{ fontSize: 12, color: 'var(--green-text)' }}>Email verified</span>
             )}
           </div>
         </div>
+        <form onSubmit={handleUsernameSubmit}>
+          <Input
+            label="Username"
+            type="text"
+            placeholder="jane_doe"
+            value={usernameValue}
+            onChange={(e) => setUsernameValue(e.target.value)}
+            autoComplete="username"
+            style={{ marginBottom: 12 }}
+          />
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
+            3–50 characters, letters, numbers, and underscores only. Must be unique.
+          </p>
+          {usernameError && <div className="error-msg" style={{ marginBottom: 12 }}>{usernameError}</div>}
+          {usernameSuccess && <div style={{ fontSize: 14, color: 'var(--green-text)', marginBottom: 12 }}>Username updated.</div>}
+          <Button type="submit" disabled={!usernameChanged || usernameLoading}>
+            {usernameLoading ? 'Saving…' : 'Save username'}
+          </Button>
+        </form>
       </div>
 
       <div className="card" style={{ maxWidth: 560, borderLeft: '4px solid var(--pink-bold)' }}>

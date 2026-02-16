@@ -7,6 +7,7 @@ import Button from '../components/Button'
 import Input from '../components/Input'
 
 const SIGNUP_FIELDS = [
+  { name: 'username', label: 'Username', type: 'text', placeholder: 'jane_doe', autoComplete: 'username', required: true },
   { name: 'email', label: 'Email', type: 'email', placeholder: 'you@example.com', autoComplete: 'email', required: true },
   { name: 'password', label: 'Password', type: 'password', placeholder: '••••••••', autoComplete: 'new-password', required: true },
 ]
@@ -29,7 +30,7 @@ export default function Register() {
     setError('')
     setLoading(true)
     try {
-      const data = await apiRegister(formData.email, formData.password)
+      const data = await apiRegister(formData.email, formData.password, formData.username)
       login(data.user)
       navigate('/verify-email')
     } catch (err) {

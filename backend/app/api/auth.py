@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.config import get_settings
 from app.db import get_db
 from app.models.user import User
@@ -13,6 +14,7 @@ from app.schemas.auth import (
     UserCreate,
     UserLogin,
     UserResponse,
+    UserUpdateUsername,
     VerifyEmailRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
@@ -36,9 +38,18 @@ RESET_TOKEN_EXPIRY_MINUTES = 15
 def _make_user_response(user: User) -> UserResponse:
     return UserResponse(
         id=user.id,
+        username=user.username,
         email=user.email,
         email_verified=getattr(user, "email_verified", False),
     )
+
+
+def _username_taken(db: Session, username: str, exclude_user_id: int | None = None) -> bool:
+    """Check if username is taken (case-insensitive). Optionally exclude a user (for updates)."""
+    q = db.query(User).filter(func.lower(User.username) == username.lower())
+    if exclude_user_id is not None:
+        q = q.filter(User.id != exclude_user_id)
+    return q.first() is not None
 
 
 def _create_verification_for_user(db: Session, user: User) -> EmailVerification:
@@ -56,6 +67,11 @@ def _create_verification_for_user(db: Session, user: User) -> EmailVerification:
 
 @router.post("/register", response_model=Token)
 def register(data: UserCreate, db: Session = Depends(get_db)):
+    if _username_taken(db, data.username):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken",
+        )
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(
@@ -63,6 +79,7 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered",
         )
     user = User(
+        username=data.username.strip(),
         email=data.email,
         password_hash=hash_password(data.password),
         email_verified=False,
@@ -97,6 +114,24 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
+    return _make_user_response(current_user)
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_me(
+    data: UserUpdateUsername,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update the current user's username. Must be unique (case-insensitive)."""
+    if _username_taken(db, data.username, exclude_user_id=current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken",
+        )
+    current_user.username = data.username.strip()
+    db.commit()
+    db.refresh(current_user)
     return _make_user_response(current_user)
 
 
