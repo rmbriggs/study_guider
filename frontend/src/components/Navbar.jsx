@@ -31,9 +31,9 @@ export default function Navbar() {
         )}
       </div>
       {user && (
-        <div className="nav-avatar" title={user.email}>
+        <Link to="/settings" className="nav-avatar" title={`${user.email} — Account settings`}>
           {user.email.slice(0, 2).toUpperCase()}
-        </div>
+        </Link>
       )}
     </nav>
   )

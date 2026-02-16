@@ -52,3 +52,8 @@ export async function resetPassword(token, newPassword) {
   const { data } = await api.post('/auth/reset-password', { token, new_password: newPassword })
   return data
 }
+
+/** Permanently delete the current user's account. Caller should clear auth state (e.g. logout) and redirect. */
+export async function deleteAccount() {
+  await api.delete('/auth/me')
+}

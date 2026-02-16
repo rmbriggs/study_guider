@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.models.user import User
+from app.models.guide import StudyGuide
 from app.models.verification import EmailVerification, PasswordResetToken
 from app.schemas.auth import (
     Token,
@@ -202,3 +203,19 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
     db.delete(prt)
     db.commit()
     return {"message": "Password updated"}
+
+
+@router.delete("/me")
+def delete_account(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Permanently delete the current user's account and all their data."""
+    guides = db.query(StudyGuide).filter(StudyGuide.user_id == current_user.id).all()
+    for guide in guides:
+        db.delete(guide)
+    db.query(EmailVerification).filter(EmailVerification.user_id == current_user.id).delete()
+    db.query(PasswordResetToken).filter(PasswordResetToken.user_id == current_user.id).delete()
+    db.delete(current_user)
+    db.commit()
+    return {"message": "Account deleted"}

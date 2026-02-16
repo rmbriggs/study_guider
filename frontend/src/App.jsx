@@ -10,6 +10,7 @@ import VerifyEmail from './pages/VerifyEmail'
 import Dashboard from './pages/Dashboard'
 import CreateGuide from './pages/CreateGuide'
 import GuideView from './pages/GuideView'
+import Settings from './pages/Settings'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -79,6 +80,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AppLayout><GuideView /></AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <AppLayout><Settings /></AppLayout>
           </ProtectedRoute>
         }
       />
