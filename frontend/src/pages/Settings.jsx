@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Sun, Moon } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import { deleteAccount, updateUsername } from '../api/auth'
 import { getApiErrorMessage } from '../utils/apiError'
 import Button from '../components/Button'
@@ -11,6 +12,7 @@ const CONFIRM_PHRASE = 'delete'
 
 export default function Settings() {
   const { user, logout, updateUser } = useAuth()
+  const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const [confirmText, setConfirmText] = useState('')
   const [loading, setLoading] = useState(false)
@@ -66,6 +68,33 @@ export default function Settings() {
       <p className="section-subtitle" style={{ marginBottom: 32 }}>
         Manage your profile and account.
       </p>
+
+      <div className="card" style={{ maxWidth: 560, marginBottom: 32 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Appearance</h2>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16 }}>
+          Choose how Study Guider looks. Dark theme uses warm charcoal tones for a cozy feel.
+        </p>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setTheme('light')}
+            className={theme === 'light' ? 'btn btn-primary' : 'btn btn-secondary'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+          >
+            <Sun size={18} />
+            Light
+          </button>
+          <button
+            type="button"
+            onClick={() => setTheme('dark')}
+            className={theme === 'dark' ? 'btn btn-primary' : 'btn btn-secondary'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+          >
+            <Moon size={18} />
+            Dark
+          </button>
+        </div>
+      </div>
 
       <div className="card" style={{ maxWidth: 560, marginBottom: 32 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>

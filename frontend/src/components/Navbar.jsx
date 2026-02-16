@@ -1,15 +1,9 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { BookOpen } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Navbar() {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
-
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
+  const { user } = useAuth()
 
   return (
     <nav className="navbar">
@@ -24,9 +18,6 @@ export default function Navbar() {
           <>
             <Link to="/" className="nav-link">Dashboard</Link>
             <Link to="/create" className="nav-link">Create Guide</Link>
-            <button type="button" className="btn btn-ghost" onClick={handleLogout}>
-              Log out
-            </button>
           </>
         )}
       </div>

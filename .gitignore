@@ -1,6 +1,17 @@
-backend/scripts/__pycache__/delete_all_accounts.cpython-314.pyc
-backend/scripts/__pycache__/__init__.cpython-314.pyc
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.Python
+venv/
+.venv/
+backend/venv/
 
 # Env and secrets (do not commit)
 .env
 backend/.env
+
+# Local SQLite DB (dev data)
+*.db
+backend/*.db

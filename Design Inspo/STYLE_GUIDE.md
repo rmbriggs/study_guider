@@ -16,6 +16,8 @@ This is a **warm, friendly dashboard/app** that feels inviting rather than cold 
 
 **Personality keywords:** Friendly, Playful, Organized, Warm, Modern
 
+> **Theme support:** This design system supports both **Light** and **Dark** modes. All components use CSS custom properties that automatically remap when the theme changes. See **Section 14** for the full dark mode specification.
+
 ---
 
 ## 2. Color System
@@ -798,7 +800,376 @@ Active chip = filled with accent color. Inactive = outlined.
 
 ---
 
-## 14. Quick Reference: CSS Custom Properties (Copy-Paste)
+## 14. Dark Mode
+
+Dark mode preserves the **warm, friendly personality** of the light theme — it should feel like a cozy room at night, not a cold terminal. The key principle: **warm darks, not cold blacks.**
+
+### 14.1 Theme Switching Implementation
+
+Use a `data-theme` attribute on `<html>` and the CSS custom property override pattern. This lets every component automatically adapt without any class changes.
+
+```css
+/* Theme is controlled via attribute on <html> */
+/* <html data-theme="light"> or <html data-theme="dark"> */
+
+/* Respect system preference as default */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    /* Apply dark mode variables (same as [data-theme="dark"]) */
+  }
+}
+```
+
+```js
+// Toggle theme in JS
+function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+}
+
+// On page load — respect saved preference, then system preference
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+}
+```
+
+### 14.2 Dark Mode Background Palette
+
+The dark backgrounds use **warm charcoal tones** with a subtle purple/blue undertone that echoes the light theme's warmth. Never use pure black (#000000).
+
+```css
+[data-theme="dark"] {
+  /* Primary canvas — warm dark charcoal, NOT cold gray or pure black */
+  --bg-primary: #13131D;          /* deepest background — page canvas */
+  --bg-secondary: #1A1A28;       /* slightly elevated — alternate sections, sidebar */
+  --bg-tertiary: #262636;        /* borders, dividers, inset wells */
+
+  /* Surface colors — cards and elevated elements */
+  --surface-solid: #1E1E2D;              /* card background */
+  --surface-frosted: rgba(30, 30, 46, 0.72); /* frosted glass on dark */
+  --surface-hover: #24243A;              /* hover state */
+  --surface-active: #2A2A42;             /* pressed/active state */
+
+  /* "Light section" inversion — for emphasis blocks that flip to light */
+  --surface-dark: #F7F4EF;               /* becomes the light cream */
+  --surface-dark-secondary: #F0EDE8;
+}
+```
+
+**Why these specific colors?**
+- `#13131D` has an R:19, G:19, B:29 ratio — the blue channel is slightly higher, giving warmth without feeling cold
+- Cards at `#1E1E2D` create just enough contrast against the page background to be visible without needing heavy shadows
+- The palette avoids the common mistake of "gray dark mode" which feels lifeless
+
+### 14.3 Dark Mode Text Colors
+
+Text colors flip to light variants. The primary text is warm off-white (not pure white, which causes eye strain).
+
+```css
+[data-theme="dark"] {
+  --text-primary: #EDEAE5;        /* warm off-white — headings and body */
+  --text-secondary: #9B9BAF;      /* medium lavender-gray — descriptions */
+  --text-muted: #5E5E72;          /* dim — timestamps, metadata, placeholders */
+  --text-on-dark: #1A1A2E;        /* for inverted/light sections */
+  --text-on-dark-muted: #5F6577;  /* muted text on inverted light sections */
+}
+```
+
+### 14.4 Dark Mode Accent Colors
+
+The **bold** accent colors stay the same or get slightly brighter for visibility. The **soft** backgrounds become deeply tinted transparent overlays. The **text** variants lighten for readability on dark surfaces.
+
+```css
+[data-theme="dark"] {
+  /* Purple */
+  --purple-bold: #A78BFA;                    /* slightly brighter */
+  --purple-soft: rgba(139, 92, 246, 0.15);   /* translucent tint */
+  --purple-ring: rgba(139, 92, 246, 0.30);
+  --purple-text: #C4B5FD;                    /* light for readability */
+
+  /* Green */
+  --green-bold: #34D399;
+  --green-soft: rgba(34, 197, 94, 0.15);
+  --green-ring: rgba(34, 197, 94, 0.30);
+  --green-text: #86EFAC;
+
+  /* Yellow/Gold */
+  --yellow-bold: #FACC15;
+  --yellow-soft: rgba(234, 179, 8, 0.15);
+  --yellow-ring: rgba(234, 179, 8, 0.30);
+  --yellow-text: #FDE68A;
+
+  /* Blue */
+  --blue-bold: #60A5FA;
+  --blue-soft: rgba(59, 130, 246, 0.15);
+  --blue-ring: rgba(59, 130, 246, 0.30);
+  --blue-text: #93C5FD;
+
+  /* Orange */
+  --orange-bold: #FB923C;
+  --orange-soft: rgba(249, 115, 22, 0.15);
+  --orange-ring: rgba(249, 115, 22, 0.30);
+  --orange-text: #FDBA74;
+
+  /* Pink/Rose */
+  --pink-bold: #F472B6;
+  --pink-soft: rgba(236, 72, 153, 0.15);
+  --pink-ring: rgba(236, 72, 153, 0.30);
+  --pink-text: #F9A8D4;
+
+  /* Teal */
+  --teal-bold: #2DD4BF;
+  --teal-soft: rgba(20, 184, 166, 0.15);
+  --teal-ring: rgba(20, 184, 166, 0.30);
+  --teal-text: #5EEAD4;
+}
+```
+
+**Why translucent soft backgrounds?** Using `rgba()` instead of opaque hex values means the badge/chip backgrounds naturally blend with whatever surface they're on — whether that's a card, a sidebar, or a frosted panel. This eliminates the common dark mode problem of "floating color patches" that don't integrate with their container.
+
+### 14.5 Dark Mode Semantic Colors
+
+```css
+[data-theme="dark"] {
+  --color-success: #34D399;
+  --color-warning: #FACC15;
+  --color-error: #F87171;
+  --color-error-soft: rgba(239, 68, 68, 0.15);
+  --color-info: #60A5FA;
+}
+```
+
+### 14.6 Dark Mode Shadows & Elevation
+
+Shadows are nearly invisible on dark backgrounds. In dark mode, **borders and subtle luminosity** replace shadows as the primary elevation cues.
+
+```css
+[data-theme="dark"] {
+  /* Shadows use deeper opacity + slight dark glow */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.20);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.30), 0 2px 4px rgba(0, 0, 0, 0.20);
+  --shadow-xl: 0 8px 32px rgba(0, 0, 0, 0.40), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.20);
+}
+```
+
+### 14.7 Dark Mode Component Adjustments
+
+These are the key component-level changes that go beyond simple variable remapping.
+
+#### Cards — Add border for visibility
+
+```css
+[data-theme="dark"] .card {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  /* Shadow is still applied via --shadow-md, but border does the heavy lifting */
+}
+
+[data-theme="dark"] .card:hover {
+  border-color: rgba(255, 255, 255, 0.10);
+}
+```
+
+#### Frosted Glass — Inverted glass treatment
+
+```css
+[data-theme="dark"] .card-glass {
+  background: rgba(30, 30, 46, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+```
+
+#### Navbar & Sidebar — Subtle top-edge highlight
+
+```css
+[data-theme="dark"] .navbar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .sidebar {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+```
+
+#### Buttons — Primary inverts to cream-on-dark
+
+```css
+[data-theme="dark"] .btn-primary {
+  background: var(--text-primary);  /* warm off-white (#EDEAE5) */
+  color: #13131D;                   /* dark background color */
+}
+
+[data-theme="dark"] .btn-secondary {
+  background: var(--surface-solid);
+  border-color: rgba(255, 255, 255, 0.10);
+  color: var(--text-primary);
+}
+[data-theme="dark"] .btn-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--surface-hover);
+}
+
+[data-theme="dark"] .btn-ghost:hover {
+  background: var(--surface-hover);
+}
+```
+
+#### Inputs — Darker well with glowing focus
+
+```css
+[data-theme="dark"] .input {
+  background: var(--bg-primary);          /* sunken into the page */
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+[data-theme="dark"] .input:focus {
+  border-color: var(--blue-bold);
+  box-shadow: 0 0 0 3px var(--blue-soft); /* translucent blue glow */
+}
+[data-theme="dark"] .input::placeholder {
+  color: var(--text-muted);
+}
+```
+
+#### Chips — Use translucent backgrounds
+
+```css
+/* Already handled by the accent color soft variants being rgba() in dark mode */
+/* No additional component-level overrides needed for chips */
+```
+
+#### Preview Cards — Colored top border stays vibrant
+
+```css
+/* The gradient top border on preview cards stays the same in dark mode */
+/* because accent bold colors are already optimized for dark backgrounds */
+```
+
+#### Scrollbar Styling (Optional)
+
+```css
+[data-theme="dark"] {
+  scrollbar-color: var(--bg-tertiary) transparent;
+}
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 8px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+}
+```
+
+### 14.8 Theme Toggle Component
+
+Include a toggle in the navbar for user control. Recommended design:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [Logo]    Dashboard  Projects  Analytics    [☀/🌙] [Avatar]│
+└─────────────────────────────────────────────────────────────┘
+```
+
+```css
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--surface-hover);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+.theme-toggle:hover {
+  background: var(--bg-tertiary);
+  transform: scale(1.05);
+}
+
+[data-theme="dark"] .theme-toggle {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+```
+
+### 14.9 Dark Mode Animation: Theme Transition
+
+Add a smooth transition when switching themes to avoid a jarring flash.
+
+```css
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Apply transition to all theme-aware surfaces */
+html, body, .navbar, .sidebar, .card, .card-glass,
+.btn-primary, .btn-secondary, .input, .chip {
+  transition: background-color 0.3s ease,
+              color 0.3s ease,
+              border-color 0.3s ease,
+              box-shadow 0.3s ease;
+}
+```
+
+### 14.10 Dark Mode Do's and Don'ts
+
+#### DO:
+- ✅ Use `#13131D` (warm charcoal) as the darkest background — never pure black
+- ✅ Use warm off-white `#EDEAE5` for primary text — never pure white `#FFFFFF`
+- ✅ Use translucent `rgba()` for accent soft backgrounds so they blend with any surface
+- ✅ Replace shadow-based elevation with subtle borders (`rgba(255,255,255,0.06)`)
+- ✅ Keep accent **bold** colors slightly brighter than in light mode for legibility
+- ✅ Add a smooth 300ms transition when toggling themes
+- ✅ Test icon badges on dark surfaces — they should still "pop" with their colored backgrounds
+- ✅ Respect `prefers-color-scheme` as the default, with user override saved in localStorage
+- ✅ Keep frosted glass looking frosted — increase blur to 20px in dark mode
+- ✅ Maintain the same border-radius, spacing, and typography — only colors change
+
+#### DON'T:
+- ❌ Use pure black (`#000000`) anywhere — it creates too much contrast and feels harsh
+- ❌ Use pure white (`#FFFFFF`) for text — it causes eye strain on dark backgrounds
+- ❌ Use opaque hex values for accent soft backgrounds — they'll look like floating colored boxes
+- ❌ Keep the same light-mode shadows — they're invisible on dark; use borders instead
+- ❌ Desaturate accent colors too much — the rainbow personality should stay vibrant
+- ❌ Forget to update the frosted glass — `rgba(255,255,255,0.65)` becomes a white blob in dark mode
+- ❌ Use a different font, spacing scale, or border-radius — the layout stays identical
+- ❌ Make the "dark section" (Section 11) still dark — it should **invert** to the light cream palette
+- ❌ Skip the theme transition animation — instant color changes feel broken
+
+### 14.11 Color Contrast Reference
+
+Minimum contrast ratios for WCAG AA compliance on dark backgrounds:
+
+| Element            | Foreground        | Background    | Contrast Ratio | Status |
+|--------------------|-------------------|---------------|----------------|--------|
+| Primary text       | #EDEAE5           | #1E1E2D       | 12.8:1         | ✅ AAA |
+| Secondary text     | #9B9BAF           | #1E1E2D       | 5.2:1          | ✅ AA  |
+| Muted text         | #5E5E72           | #1E1E2D       | 2.7:1          | ⚠️ Decorative only |
+| Purple bold on soft| #A78BFA           | rgba bg       | 7.1:1          | ✅ AA  |
+| Green bold on soft | #34D399           | rgba bg       | 8.3:1          | ✅ AAA |
+| Primary text on bg | #EDEAE5           | #13131D       | 14.6:1         | ✅ AAA |
+
+> **Note:** Muted text (`--text-muted`) is intentionally below AA contrast — it should only be used for non-essential decorative metadata (timestamps, counts, divider dots). Never use it for actionable content.
+
+---
+
+## 15. Quick Reference: CSS Custom Properties (Copy-Paste)
 
 ```css
 :root {
@@ -868,5 +1239,64 @@ Active chip = filled with accent color. Inactive = outlined.
   --transition-base: 0.2s ease;
   --transition-slow: 0.3s ease;
   --transition-spring: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================
+   DARK MODE OVERRIDES
+   ============================================ */
+[data-theme="dark"] {
+  /* Backgrounds */
+  --bg-primary: #13131D;
+  --bg-secondary: #1A1A28;
+  --bg-tertiary: #262636;
+  --surface-solid: #1E1E2D;
+  --surface-frosted: rgba(30, 30, 46, 0.72);
+  --surface-hover: #24243A;
+  --surface-active: #2A2A42;
+  --surface-dark: #F7F4EF;
+  --surface-dark-secondary: #F0EDE8;
+
+  /* Text */
+  --text-primary: #EDEAE5;
+  --text-secondary: #9B9BAF;
+  --text-muted: #5E5E72;
+  --text-on-dark: #1A1A2E;
+  --text-on-dark-muted: #5F6577;
+
+  /* Accent: Purple */
+  --purple-bold: #A78BFA;  --purple-soft: rgba(139,92,246,0.15);
+  --purple-ring: rgba(139,92,246,0.30);  --purple-text: #C4B5FD;
+  /* Accent: Green */
+  --green-bold: #34D399;   --green-soft: rgba(34,197,94,0.15);
+  --green-ring: rgba(34,197,94,0.30);    --green-text: #86EFAC;
+  /* Accent: Yellow */
+  --yellow-bold: #FACC15;  --yellow-soft: rgba(234,179,8,0.15);
+  --yellow-ring: rgba(234,179,8,0.30);   --yellow-text: #FDE68A;
+  /* Accent: Blue */
+  --blue-bold: #60A5FA;    --blue-soft: rgba(59,130,246,0.15);
+  --blue-ring: rgba(59,130,246,0.30);    --blue-text: #93C5FD;
+  /* Accent: Orange */
+  --orange-bold: #FB923C;  --orange-soft: rgba(249,115,22,0.15);
+  --orange-ring: rgba(249,115,22,0.30);  --orange-text: #FDBA74;
+  /* Accent: Pink */
+  --pink-bold: #F472B6;    --pink-soft: rgba(236,72,153,0.15);
+  --pink-ring: rgba(236,72,153,0.30);    --pink-text: #F9A8D4;
+  /* Accent: Teal */
+  --teal-bold: #2DD4BF;    --teal-soft: rgba(20,184,166,0.15);
+  --teal-ring: rgba(20,184,166,0.30);    --teal-text: #5EEAD4;
+
+  /* Semantic */
+  --color-success: #34D399;
+  --color-warning: #FACC15;
+  --color-error: #F87171;
+  --color-error-soft: rgba(239,68,68,0.15);
+  --color-info: #60A5FA;
+
+  /* Shadows (deeper for dark mode) */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.20);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.15);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.30), 0 2px 4px rgba(0,0,0,0.20);
+  --shadow-xl: 0 8px 32px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.25);
+  --shadow-hover: 0 8px 24px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.20);
 }
 ```
