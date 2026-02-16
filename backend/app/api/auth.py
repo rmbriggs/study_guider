@@ -21,16 +21,9 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
         )
-    try:
-        password_hash = hash_password(data.password)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
     user = User(
         email=data.email,
-        password_hash=password_hash,
+        password_hash=hash_password(data.password),
     )
     db.add(user)
     db.commit()

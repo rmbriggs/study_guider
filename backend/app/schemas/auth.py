@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 
-PASSWORD_MAX_LENGTH = 20
+# Allow longer than 72 bytes; auth_service pre-hashes with SHA-256 before bcrypt for long passwords
+PASSWORD_MAX_LENGTH = 128
 
 
 class UserCreate(BaseModel):
