@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, FilePlus } from 'lucide-react'
+import { BookOpen, FilePlus, Mail } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 import { getMyGuides } from '../api/guides'
 import Button from '../components/Button'
 
 export default function Dashboard() {
+  const { user } = useAuth()
   const [guides, setGuides] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -30,6 +32,16 @@ export default function Dashboard() {
         <h1 className="section-title">My Study Guides</h1>
         <p className="section-subtitle">Create a new guide or open one below.</p>
       </div>
+      {user && !user.email_verified && (
+        <div className="card animate-in delay-1" style={{ marginBottom: 24, borderLeft: '4px solid var(--blue-bold)', display: 'flex', alignItems: 'center', gap: 16 }}>
+          <Mail size={24} style={{ color: 'var(--blue-bold)', flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <strong>Verify your email to create study guides.</strong>
+            <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--text-secondary)' }}>Check your inbox or enter the code on the verify page.</p>
+          </div>
+          <Link to="/verify-email"><Button variant="accent">Verify email</Button></Link>
+        </div>
+      )}
       <div className="animate-in delay-2" style={{ marginBottom: 24 }}>
         <Link to="/create">
           <Button variant="accent" className="btn-accent">

@@ -17,9 +17,24 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     id: int
     email: str
+    email_verified: bool = False
 
     class Config:
         from_attributes = True
+
+
+class VerifyEmailRequest(BaseModel):
+    code: str | None = None
+    token: str | None = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=1, max_length=PASSWORD_MAX_LENGTH)
 
 
 class Token(BaseModel):

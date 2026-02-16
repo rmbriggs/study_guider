@@ -1,17 +1,23 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Upload } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
 import { createGuide } from '../api/guides'
+import { useAuth } from '../context/AuthContext'
+import { verifyEmail } from '../api/auth'
+import { getApiErrorMessage } from '../utils/apiError'
 import Button from '../components/Button'
 import Input from '../components/Input'
 
 export default function CreateGuide() {
+  const { user, login } = useAuth()
   const [title, setTitle] = useState('')
   const [professorName, setProfessorName] = useState('')
   const [userSpecs, setUserSpecs] = useState('')
   const [files, setFiles] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [verifyCode, setVerifyCode] = useState('')
+  const [verifyError, setVerifyError] = useState('')
+  const [verifyLoading, setVerifyLoading] = useState(false)
   const navigate = useNavigate()
 
   const handleFileChange = (e) => {
@@ -22,6 +28,10 @@ export default function CreateGuide() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    if (user && !user.email_verified) {
+      setError('Please verify your email address to create study guides.')
+      return
+    }
     if (files.length === 0) {
       setError('Please upload at least one file (PDF or TXT).')
       return
@@ -36,10 +46,53 @@ export default function CreateGuide() {
       const data = await createGuide(formData)
       navigate(`/guide/${data.id}`)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create guide')
+      setError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to create guide'))
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleVerifyCode = async (e) => {
+    e.preventDefault()
+    if (!verifyCode.trim() || verifyCode.length !== 6) return
+    setVerifyError('')
+    setVerifyLoading(true)
+    try {
+      const data = await verifyEmail({ code: verifyCode.trim() })
+      if (data.user) login(data.user)
+    } catch (err) {
+      setVerifyError(getApiErrorMessage(err, 'Invalid or expired code'))
+    } finally {
+      setVerifyLoading(false)
+    }
+  }
+
+  if (user && !user.email_verified) {
+    return (
+      <>
+        <div className="animate-in">
+          <h1 className="section-title">Create study guide</h1>
+          <p className="section-subtitle">Verify your email to create study guides.</p>
+        </div>
+        <div className="card animate-in delay-2" style={{ maxWidth: 480, marginBottom: 24 }}>
+          <p style={{ marginBottom: 16 }}>You need to verify your email before you can create study guides. Check your inbox or enter the 6-digit code below.</p>
+          <form onSubmit={handleVerifyCode} style={{ marginBottom: 16 }}>
+            <Input
+              label="Verification code"
+              placeholder="000000"
+              value={verifyCode}
+              onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              style={{ marginBottom: 8 }}
+            />
+            {verifyError && <div className="error-msg" style={{ marginBottom: 8 }}>{verifyError}</div>}
+            <Button type="submit" disabled={verifyLoading || verifyCode.length !== 6}>Verify</Button>
+          </form>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+            <Link to="/verify-email" style={{ color: 'var(--blue-bold)' }}>Open verify email page</Link> to resend the code.
+          </p>
+        </div>
+      </>
+    )
   }
 
   return (

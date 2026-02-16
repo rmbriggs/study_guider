@@ -4,6 +4,9 @@ import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
+import VerifyEmail from './pages/VerifyEmail'
 import Dashboard from './pages/Dashboard'
 import CreateGuide from './pages/CreateGuide'
 import GuideView from './pages/GuideView'
@@ -51,6 +54,10 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
       <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       <Route
         path="/"
         element={

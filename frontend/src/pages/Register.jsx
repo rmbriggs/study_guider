@@ -31,7 +31,7 @@ export default function Register() {
     try {
       const data = await apiRegister(formData.email, formData.password)
       login(data.user)
-      navigate('/')
+      navigate('/verify-email')
     } catch (err) {
       setError(getApiErrorMessage(err, 'Registration failed. Make sure the backend is running (port 8000). See README for how to start it.'))
     } finally {

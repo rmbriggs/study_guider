@@ -41,3 +41,8 @@ def decode_access_token(token: str) -> int | None:
         return int(sub) if sub else None
     except JWTError:
         return None
+
+
+def hash_reset_token(token: str) -> str:
+    """Hash a password-reset token for storage. Use same input for lookup."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

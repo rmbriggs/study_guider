@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { login as apiLogin } from '../api/auth'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -13,6 +13,12 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const successMessage = location.state?.message
+
+  useEffect(() => {
+    if (successMessage) window.history.replaceState({}, '', location.pathname)
+  }, [successMessage, location.pathname])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -55,12 +61,16 @@ export default function Login() {
             autoComplete="current-password"
             style={{ marginBottom: 24 }}
           />
+          {successMessage && <div style={{ marginBottom: 16, color: 'var(--green)', fontSize: 14 }}>{successMessage}</div>}
           {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
           <Button type="submit" disabled={loading} style={{ width: '100%' }}>
             {loading ? 'Logging in…' : 'Log in'}
           </Button>
         </form>
-        <p style={{ marginTop: 24, fontSize: 14, color: 'var(--text-secondary)' }}>
+        <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-secondary)' }}>
+          <Link to="/forgot-password" style={{ color: 'var(--blue-bold)' }}>Forgot password?</Link>
+        </p>
+        <p style={{ marginTop: 8, fontSize: 14, color: 'var(--text-secondary)' }}>
           Don't have an account? <Link to="/register" style={{ color: 'var(--blue-bold)' }}>Sign up</Link>
         </p>
       </div>

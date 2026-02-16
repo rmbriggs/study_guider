@@ -54,6 +54,17 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+button.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+button.link-button:hover {
+  border-color: transparent;
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

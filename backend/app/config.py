@@ -1,5 +1,10 @@
-from pydantic_settings import BaseSettings
+from pathlib import Path
 from functools import lru_cache
+from pydantic_settings import BaseSettings
+
+# Load .env from backend directory so it works regardless of cwd when starting uvicorn
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_ENV_FILE = _BACKEND_DIR / ".env"
 
 
 class Settings(BaseSettings):
@@ -22,8 +27,16 @@ class Settings(BaseSettings):
     max_files_per_request: int = 10
     allowed_extensions: set[str] = {"pdf", "txt"}
 
+    # Email (SMTP) for verification and password reset
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    frontend_base_url: str = "https://localhost:5173"
+
     class Config:
-        env_file = ".env"
+        env_file = _ENV_FILE
         extra = "ignore"
 
 

@@ -18,6 +18,14 @@ Copy `backend/.env.example` to `backend/.env` and set:
 
 - `SECRET_KEY` – used for JWT signing
 - `GEMINI_API_KEY` – required for generating study guides (get one at aistudio.google.com/apikey)
+- **Email (optional)** – For email verification and password reset, set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM_EMAIL`. Set `FRONTEND_BASE_URL` to your frontend URL (e.g. `http://localhost:5173`) so verification and reset links work. If SMTP is not configured, the app still runs; verification/reset links and codes are only logged to the console.
+
+If you have an existing database, run the one-off migration to add the `email_verified` column:
+
+```bash
+cd backend
+python scripts/migrate_add_email_verification.py
+```
 
 Run the API:
 
@@ -40,7 +48,7 @@ Open https://localhost:5173. The dev server uses a self-signed certificate—acc
 
 ## Usage
 
-1. Register or log in.
+1. Register or log in. After signup you must verify your email (via the link or 6-digit code sent to you) before you can create study guides; you can still browse the app.
 2. Click **Create study guide** and fill in:
    - Title, professor/course, and any instructions.
    - Upload one or more PDF or TXT files (handouts, notes, past tests).
