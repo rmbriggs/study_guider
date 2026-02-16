@@ -36,7 +36,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The dev server proxies `/api` to the backend. If you run the frontend without the dev server, set `VITE_API_URL=http://127.0.0.1:8000/api` so the app can reach the API.
+Open https://localhost:5173. The dev server uses a self-signed certificate—accept the browser warning once (e.g. "Advanced" → "Proceed to localhost"). The dev server proxies `/api` to the backend. If you run the frontend without the dev server, set `VITE_API_URL=http://127.0.0.1:8000/api` so the app can reach the API.
 
 ## Usage
 
