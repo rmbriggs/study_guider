@@ -12,10 +12,15 @@ Write in clear, student-friendly language. Use Markdown for headings, lists, and
 GEMINI_MODEL = "gemini-1.5-flash"
 
 
-def build_user_prompt(professor_name: str, user_specs: str | None, source_sections: list[tuple[str, str]]) -> str:
+def build_user_prompt(course: str, professor_name: str, user_specs: str | None, source_sections: list[tuple[str, str]]) -> str:
     parts = []
-    if professor_name:
-        parts.append(f"Professor/Course: {professor_name}")
+    if course or professor_name:
+        line = []
+        if course:
+            line.append(f"Course: {course}")
+        if professor_name:
+            line.append(f"Professor: {professor_name}")
+        parts.append(" ".join(line))
     if user_specs and user_specs.strip():
         parts.append(f"User specifications:\n{user_specs.strip()}")
     parts.append("\n---\nMaterials from uploaded files:\n")
@@ -25,7 +30,7 @@ def build_user_prompt(professor_name: str, user_specs: str | None, source_sectio
     return "\n".join(parts)
 
 
-def generate_study_guide(professor_name: str, user_specs: str | None, source_sections: list[tuple[str, str]], api_key: str) -> tuple[str, str]:
+def generate_study_guide(course: str, professor_name: str, user_specs: str | None, source_sections: list[tuple[str, str]], api_key: str) -> tuple[str, str]:
     """
     Call Gemini (Google) to generate study guide. Returns (content, model_used).
     source_sections: list of (file_label, extracted_text).
@@ -37,7 +42,7 @@ def generate_study_guide(professor_name: str, user_specs: str | None, source_sec
     if not api_key:
         raise ValueError("GEMINI_API_KEY is not set")
     genai.configure(api_key=api_key)
-    user_content = build_user_prompt(professor_name, user_specs, source_sections)
+    user_content = build_user_prompt(course, professor_name, user_specs, source_sections)
     if not user_content.strip():
         return (
             "*No content could be extracted from the uploaded files. Please upload PDF or text files with readable content.*",

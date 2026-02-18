@@ -25,6 +25,7 @@ class StudyGuideResponse(BaseModel):
     id: int
     user_id: int
     title: str
+    course: str
     professor_name: str
     user_specs: str | None
     status: str
@@ -39,6 +40,7 @@ class StudyGuideResponse(BaseModel):
 class StudyGuideListItem(BaseModel):
     id: int
     title: str
+    course: str
     professor_name: str
     status: str
     created_at: datetime
@@ -55,3 +57,8 @@ class CreateGuideResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class GuideOptionsResponse(BaseModel):
+    courses: list[str]
+    professors: list[str]

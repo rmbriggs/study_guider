@@ -43,9 +43,11 @@ export default function GuideView() {
         </Link>
         <h1 className="section-title">{guide.title}</h1>
         <p className="section-subtitle">
-          {guide.professor_name && `${guide.professor_name} · `}
-          {guide.sources?.length > 0 && `${guide.sources.length} source(s)`}
-          {guide.output?.model_used && ` · Generated with ${guide.output.model_used}`}
+          {[
+            [guide.course, guide.professor_name].filter(Boolean).join(' · '),
+            guide.sources?.length > 0 && `${guide.sources.length} source(s)`,
+            guide.output?.model_used && `Generated with ${guide.output.model_used}`,
+          ].filter(Boolean).join(' · ')}
         </p>
       </div>
       {!hasOutput && (

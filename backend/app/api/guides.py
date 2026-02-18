@@ -6,12 +6,14 @@ from app.config import get_settings
 from app.db import get_db
 from app.models.user import User
 from app.models.guide import StudyGuide, GuideSource, StudyGuideOutput, GuideStatus
+from app.models.course import Course, Professor
 from app.schemas.guides import (
     StudyGuideResponse,
     StudyGuideListItem,
     CreateGuideResponse,
     GuideOutputResponse,
     GuideSourceResponse,
+    GuideOptionsResponse,
 )
 from app.api.deps import get_current_user
 from app.services.file_parser import extract_text_from_file
@@ -36,7 +38,52 @@ def list_my_guides(
     current_user: User = Depends(get_current_user),
 ):
     guides = db.query(StudyGuide).filter(StudyGuide.user_id == current_user.id).order_by(StudyGuide.created_at.desc()).all()
-    return guides
+    return [
+        StudyGuideListItem(
+            id=g.id,
+            title=g.title,
+            course=getattr(g, "course", None) or "",
+            professor_name=g.professor_name,
+            status=g.status,
+            created_at=g.created_at,
+        )
+        for g in guides
+    ]
+
+
+@router.get("/options", response_model=GuideOptionsResponse)
+def get_guide_options(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return distinct courses and professor names from guides and from Course/Professor tables."""
+    from sqlalchemy import distinct
+    # Courses: from Course table (nickname) + distinct from guides
+    guide_courses = {
+        row[0] for row in
+        db.query(distinct(StudyGuide.course)).filter(
+            StudyGuide.user_id == current_user.id,
+            StudyGuide.course != "",
+        ).all()
+        if row[0]
+    }
+    course_nicknames = {
+        c.nickname for c in
+        db.query(Course).filter(Course.user_id == current_user.id).all()
+    }
+    courses = sorted(guide_courses | course_nicknames)
+    # Professors: from Professor table + distinct from guides
+    guide_professors = {
+        row[0] for row in
+        db.query(distinct(StudyGuide.professor_name)).filter(
+            StudyGuide.user_id == current_user.id,
+            StudyGuide.professor_name != "",
+        ).all()
+        if row[0]
+    }
+    professor_names = {p.name for p in db.query(Professor).filter(Professor.user_id == current_user.id).all()}
+    professors = sorted(guide_professors | professor_names)
+    return GuideOptionsResponse(courses=courses, professors=professors)
 
 
 @router.get("/{guide_id}", response_model=StudyGuideResponse)
@@ -60,6 +107,7 @@ def get_guide(
         id=guide.id,
         user_id=guide.user_id,
         title=guide.title,
+        course=getattr(guide, "course", "") or "",
         professor_name=guide.professor_name,
         user_specs=guide.user_specs,
         status=guide.status,
@@ -74,6 +122,7 @@ async def create_guide(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     title: str = Form("Untitled Guide"),
+    course: str = Form(""),
     professor_name: str = Form(""),
     user_specs: str | None = Form(None),
     files: list[UploadFile] = File(default=[]),
@@ -92,6 +141,7 @@ async def create_guide(
     guide = StudyGuide(
         user_id=current_user.id,
         title=title or "Untitled Guide",
+        course=course or "",
         professor_name=professor_name or "",
         user_specs=user_specs,
         status=GuideStatus.processing.value,
@@ -134,6 +184,7 @@ async def create_guide(
             source_sections.append((f.filename, text or "(no text extracted)"))
         api_key = settings.gemini_api_key
         content, model_used = generate_study_guide(
+            course=getattr(guide, "course", "") or "",
             professor_name=guide.professor_name,
             user_specs=guide.user_specs,
             source_sections=source_sections,

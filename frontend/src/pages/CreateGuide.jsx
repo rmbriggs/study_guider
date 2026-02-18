@@ -1,18 +1,36 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { createGuide } from '../api/guides'
+import { createGuide, getGuideOptions } from '../api/guides'
 import { useAuth } from '../context/AuthContext'
 import { verifyEmail } from '../api/auth'
 import { getApiErrorMessage } from '../utils/apiError'
 import { FileText, BookOpen, StickyNote } from 'lucide-react'
 import Button from '../components/Button'
 import Input from '../components/Input'
+import Select from '../components/Select'
+import NewCourseModal from '../components/NewCourseModal'
+import NewProfessorModal from '../components/NewProfessorModal'
 
 export default function CreateGuide() {
   const { user, login } = useAuth()
   const [title, setTitle] = useState('')
-  const [professorName, setProfessorName] = useState('')
+  const [courseSelect, setCourseSelect] = useState('')
+  const [professorSelect, setProfessorSelect] = useState('')
+  const [newProfessorModalOpen, setNewProfessorModalOpen] = useState(false)
   const [userSpecs, setUserSpecs] = useState('')
+  const [courseOptions, setCourseOptions] = useState([])
+  const [professorOptions, setProfessorOptions] = useState([])
+
+  const course = courseSelect === 'add-new' ? '' : courseSelect
+  const professorName = professorSelect === 'add-new' ? '' : professorSelect
+
+  const handleNewCourseSuccess = (created) => {
+    setCourseSelect(created.nickname)
+    setCourseOptions((prev) => [...new Set([...prev, created.nickname])].sort())
+  }
+  const handleNewCourseClose = () => {
+    setCourseSelect('')
+  }
   const [handouts, setHandouts] = useState([])
   const [studyGuides, setStudyGuides] = useState([])
   const [notes, setNotes] = useState([])
@@ -22,6 +40,17 @@ export default function CreateGuide() {
   const [verifyError, setVerifyError] = useState('')
   const [verifyLoading, setVerifyLoading] = useState(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (user?.email_verified) {
+      getGuideOptions()
+        .then(({ courses, professors }) => {
+          setCourseOptions(courses || [])
+          setProfessorOptions(professors || [])
+        })
+        .catch(() => {})
+    }
+  }, [user?.email_verified])
 
   const allFiles = [...handouts, ...studyGuides, ...notes]
 
@@ -40,6 +69,7 @@ export default function CreateGuide() {
     try {
       const formData = new FormData()
       formData.append('title', title || 'Untitled Guide')
+      formData.append('course', course)
       formData.append('professor_name', professorName)
       formData.append('user_specs', userSpecs)
       allFiles.forEach((f) => formData.append('files', f))
@@ -100,28 +130,63 @@ export default function CreateGuide() {
       <div className="animate-in">
         <h1 className="section-title">Create study guide</h1>
         <p className="section-subtitle">
-          Upload professor handouts, notes, or previous tests. Add professor name and any instructions.
+          Upload handouts, notes, or previous tests. Add name, course, professor, and any other details.
         </p>
       </div>
       <form onSubmit={handleSubmit} className="animate-in delay-2">
         <div className="card" style={{ marginBottom: 24 }}>
           <Input
-            label="Guide title"
+            label="Name"
             placeholder="e.g. Midterm 1 Study Guide"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             style={{ marginBottom: 16 }}
           />
-          <Input
-            label="Professor / course"
-            placeholder="e.g. Dr. Smith — Biology 101"
-            value={professorName}
-            onChange={(e) => setProfessorName(e.target.value)}
-            style={{ marginBottom: 16 }}
-          />
+          <div style={{ marginBottom: 16 }}>
+            <Select
+              label="Course"
+              value={courseSelect}
+              onChange={setCourseSelect}
+              options={courseOptions}
+              placeholder="Select a course…"
+              addNewValue="add-new"
+              addNewLabel="Add new…"
+            />
+            <NewCourseModal
+              open={courseSelect === 'add-new'}
+              onClose={handleNewCourseClose}
+              onSuccess={handleNewCourseSuccess}
+            />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <Select
+              label="Professor"
+              value={professorSelect}
+              onChange={(value) => {
+                setProfessorSelect(value)
+                if (value === 'add-new') setNewProfessorModalOpen(true)
+              }}
+              options={professorOptions}
+              placeholder="Select a professor…"
+              addNewValue="add-new"
+              addNewLabel="Add new…"
+            />
+            <NewProfessorModal
+              open={newProfessorModalOpen}
+              onClose={() => {
+                setNewProfessorModalOpen(false)
+                if (professorSelect === 'add-new') setProfessorSelect('')
+              }}
+              onSuccess={(created) => {
+                setProfessorOptions((prev) => [...new Set([...prev, created.name])].sort())
+                setProfessorSelect(created.name)
+                setNewProfessorModalOpen(false)
+              }}
+            />
+          </div>
           <div style={{ marginBottom: 0 }}>
             <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
-              Your specifications (optional)
+              Other details (optional)
             </label>
             <textarea
               className="textarea"

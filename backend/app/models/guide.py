@@ -17,6 +17,7 @@ class StudyGuide(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String(255), nullable=False, default="Untitled Guide")
+    course = Column(String(255), nullable=False, default="")
     professor_name = Column(String(255), nullable=False, default="")
     user_specs = Column(Text, nullable=True)
     status = Column(String(32), nullable=False, default=GuideStatus.processing.value)

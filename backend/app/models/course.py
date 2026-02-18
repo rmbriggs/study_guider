@@ -1,0 +1,53 @@
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from app.db import Base
+
+
+class Professor(Base):
+    __tablename__ = "professors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    specialties = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+
+    user = relationship("User", backref="professors")
+    courses = relationship("Course", back_populates="professor")
+
+
+class CourseAttachmentType:
+    HANDOUT = "handout"
+    PAST_TEST = "past_test"
+    NOTE = "note"
+
+
+class CourseAttachment(Base):
+    __tablename__ = "course_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    file_name = Column(String(255), nullable=False)
+    file_type = Column(String(64), nullable=False)  # pdf, txt
+    file_path = Column(String(512), nullable=False)
+    attachment_kind = Column(String(32), nullable=False)  # handout, past_test, note
+
+    course = relationship("Course", back_populates="attachments")
+
+
+class Course(Base):
+    __tablename__ = "courses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    official_name = Column(String(255), nullable=False)
+    nickname = Column(String(255), nullable=False)
+    professor_id = Column(Integer, ForeignKey("professors.id"), nullable=True)
+    syllabus_file_path = Column(String(512), nullable=True)
+    personal_description = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", backref="courses")
+    professor = relationship("Professor", back_populates="courses")
+    attachments = relationship("CourseAttachment", back_populates="course", cascade="all, delete-orphan")

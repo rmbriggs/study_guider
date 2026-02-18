@@ -5,6 +5,11 @@ export async function getMyGuides() {
   return data
 }
 
+export async function getGuideOptions() {
+  const { data } = await api.get('/guides/options')
+  return data
+}
+
 export async function getGuide(id) {
   const { data } = await api.get(`/guides/${id}`)
   return data

@@ -77,7 +77,7 @@ export default function Dashboard() {
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>{g.title}</div>
                   <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                    {g.professor_name || 'No professor'}
+                    {[g.course, g.professor_name].filter(Boolean).join(' · ') || 'No course or professor'}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span className={`chip ${g.status === 'completed' ? 'chip-green' : 'chip-outlined'}`}>

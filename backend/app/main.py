@@ -4,6 +4,7 @@ from app.db import engine, Base
 from app import models  # noqa: F401 - ensure all models registered for create_all
 from app.api.auth import router as auth_router
 from app.api.guides import router as guides_router
+from app.api.courses import router as courses_router
 from app.config import get_settings
 
 settings = get_settings()
@@ -24,6 +25,7 @@ app.add_middleware(
 )
 app.include_router(auth_router, prefix="/api")
 app.include_router(guides_router, prefix="/api")
+app.include_router(courses_router, prefix="/api")
 
 
 @app.get("/api/health")
