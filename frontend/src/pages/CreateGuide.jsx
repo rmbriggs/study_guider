@@ -4,6 +4,7 @@ import { createGuide } from '../api/guides'
 import { useAuth } from '../context/AuthContext'
 import { verifyEmail } from '../api/auth'
 import { getApiErrorMessage } from '../utils/apiError'
+import { FileText, BookOpen, StickyNote } from 'lucide-react'
 import Button from '../components/Button'
 import Input from '../components/Input'
 
@@ -12,7 +13,9 @@ export default function CreateGuide() {
   const [title, setTitle] = useState('')
   const [professorName, setProfessorName] = useState('')
   const [userSpecs, setUserSpecs] = useState('')
-  const [files, setFiles] = useState([])
+  const [handouts, setHandouts] = useState([])
+  const [studyGuides, setStudyGuides] = useState([])
+  const [notes, setNotes] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [verifyCode, setVerifyCode] = useState('')
@@ -20,10 +23,7 @@ export default function CreateGuide() {
   const [verifyLoading, setVerifyLoading] = useState(false)
   const navigate = useNavigate()
 
-  const handleFileChange = (e) => {
-    const list = Array.from(e.target.files || [])
-    setFiles(list)
-  }
+  const allFiles = [...handouts, ...studyGuides, ...notes]
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -32,7 +32,7 @@ export default function CreateGuide() {
       setError('Please verify your email address to create study guides.')
       return
     }
-    if (files.length === 0) {
+    if (allFiles.length === 0) {
       setError('Please upload at least one file (PDF or TXT).')
       return
     }
@@ -42,7 +42,7 @@ export default function CreateGuide() {
       formData.append('title', title || 'Untitled Guide')
       formData.append('professor_name', professorName)
       formData.append('user_specs', userSpecs)
-      files.forEach((f) => formData.append('files', f))
+      allFiles.forEach((f) => formData.append('files', f))
       const data = await createGuide(formData)
       navigate(`/guide/${data.id}`)
     } catch (err) {
@@ -132,28 +132,75 @@ export default function CreateGuide() {
             />
           </div>
         </div>
-        <div className="card" style={{ marginBottom: 24 }}>
-          <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
-            Upload files (PDF or TXT)
-          </label>
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 12 }}>
-            Handouts, notes, previous tests. Max 10 files, 10 MB each.
+        <div className="card card-static" style={{ marginBottom: 24 }}>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+            PDF or TXT. Max 10 files total, 10 MB each.
           </p>
-          <input
-            type="file"
-            accept=".pdf,.txt"
-            multiple
-            onChange={handleFileChange}
-            style={{ display: 'block', marginBottom: 8 }}
-          />
-          {files.length > 0 && (
-            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              {files.length} file(s) selected: {files.map((f) => f.name).join(', ')}
-            </p>
-          )}
+          <div className="upload-tiles">
+            <div className="upload-tile">
+              <div className="upload-tile-icon ib-blue">
+                <FileText size={22} />
+              </div>
+              <div className="upload-tile-title">Handouts</div>
+              <label className="upload-tile-trigger">
+                <input
+                  type="file"
+                  accept=".pdf,.txt"
+                  multiple
+                  onChange={(e) => setHandouts(Array.from(e.target.files || []))}
+                />
+                {handouts.length > 0 ? `${handouts.length} file(s)` : 'Choose files'}
+              </label>
+              {handouts.length > 0 && (
+                <p className="upload-tile-files">
+                  {handouts.map((f) => f.name).join(', ')}
+                </p>
+              )}
+            </div>
+            <div className="upload-tile">
+              <div className="upload-tile-icon ib-purple">
+                <BookOpen size={22} />
+              </div>
+              <div className="upload-tile-title">Study guides</div>
+              <label className="upload-tile-trigger">
+                <input
+                  type="file"
+                  accept=".pdf,.txt"
+                  multiple
+                  onChange={(e) => setStudyGuides(Array.from(e.target.files || []))}
+                />
+                {studyGuides.length > 0 ? `${studyGuides.length} file(s)` : 'Choose files'}
+              </label>
+              {studyGuides.length > 0 && (
+                <p className="upload-tile-files">
+                  {studyGuides.map((f) => f.name).join(', ')}
+                </p>
+              )}
+            </div>
+            <div className="upload-tile">
+              <div className="upload-tile-icon ib-teal">
+                <StickyNote size={22} />
+              </div>
+              <div className="upload-tile-title">Notes</div>
+              <label className="upload-tile-trigger">
+                <input
+                  type="file"
+                  accept=".pdf,.txt"
+                  multiple
+                  onChange={(e) => setNotes(Array.from(e.target.files || []))}
+                />
+                {notes.length > 0 ? `${notes.length} file(s)` : 'Choose files'}
+              </label>
+              {notes.length > 0 && (
+                <p className="upload-tile-files">
+                  {notes.map((f) => f.name).join(', ')}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
         {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
-        <Button type="submit" variant="accent" disabled={loading || files.length === 0}>
+        <Button type="submit" variant="accent" disabled={loading || allFiles.length === 0}>
           {loading ? 'Generating…' : 'Generate study guide'}
         </Button>
       </form>
