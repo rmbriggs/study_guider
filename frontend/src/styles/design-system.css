@@ -112,6 +112,10 @@ a.nav-avatar:hover { opacity: 0.9; }
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  position: sticky;
+  top: 64px;
+  align-self: flex-start;
+  height: calc(100vh - 64px);
 }
 .sidebar-nav {
   flex: 1;
