@@ -18,6 +18,12 @@ class ProfessorCreate(BaseModel):
     description: str | None = None
 
 
+class ProfessorUpdate(BaseModel):
+    name: str | None = None
+    specialties: str | None = None
+    description: str | None = None
+
+
 class CourseResponse(BaseModel):
     id: int
     official_name: str
@@ -51,3 +57,10 @@ class CourseCreateResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CourseUpdate(BaseModel):
+    official_name: str | None = None
+    nickname: str | None = None
+    professor_id: int | None = None
+    personal_description: str | None = None

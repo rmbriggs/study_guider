@@ -9,8 +9,11 @@ from app.models.course import Professor, Course, CourseAttachment, CourseAttachm
 from app.schemas.courses import (
     ProfessorResponse,
     ProfessorCreate,
+    ProfessorUpdate,
     CourseListItem,
+    CourseResponse,
     CourseCreateResponse,
+    CourseUpdate,
 )
 from app.api.deps import get_current_user
 
@@ -60,6 +63,48 @@ def create_professor(
     return professor
 
 
+@router.get("/professors/{professor_id}", response_model=ProfessorResponse)
+def get_professor(
+    professor_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    professor = db.query(Professor).filter(
+        Professor.id == professor_id,
+        Professor.user_id == current_user.id,
+    ).first()
+    if not professor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professor not found")
+    return professor
+
+
+@router.patch("/professors/{professor_id}", response_model=ProfessorResponse)
+def update_professor(
+    professor_id: int,
+    body: ProfessorUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    professor = db.query(Professor).filter(
+        Professor.id == professor_id,
+        Professor.user_id == current_user.id,
+    ).first()
+    if not professor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professor not found")
+    if body.name is not None:
+        name = (body.name or "").strip()
+        if not name:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name is required")
+        professor.name = name
+    if body.specialties is not None:
+        professor.specialties = (body.specialties or "").strip() or None
+    if body.description is not None:
+        professor.description = (body.description or "").strip() or None
+    db.commit()
+    db.refresh(professor)
+    return professor
+
+
 # ---- Courses ----
 @router.get("", response_model=list[CourseListItem])
 def list_my_courses(
@@ -76,6 +121,82 @@ def list_my_courses(
         )
         for c in courses
     ]
+
+
+@router.get("/{course_id}", response_model=CourseResponse)
+def get_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.user_id == current_user.id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    return CourseResponse(
+        id=course.id,
+        official_name=course.official_name,
+        nickname=course.nickname,
+        professor_id=course.professor_id,
+        professor_name=course.professor.name if course.professor else None,
+        syllabus_file_path=course.syllabus_file_path,
+        personal_description=course.personal_description,
+        created_at=course.created_at,
+    )
+
+
+@router.patch("/{course_id}", response_model=CourseResponse)
+def update_course(
+    course_id: int,
+    body: CourseUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.user_id == current_user.id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    if body.official_name is not None:
+        official = (body.official_name or "").strip()
+        if not official:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Official course name is required")
+        course.official_name = official
+    if body.nickname is not None:
+        nick = (body.nickname or "").strip()
+        if not nick:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nickname is required")
+        course.nickname = nick
+    if "professor_id" in body.model_dump(exclude_unset=True):
+        if body.professor_id is None or body.professor_id == 0:
+            course.professor_id = None
+        else:
+            professor = db.query(Professor).filter(
+                Professor.id == body.professor_id,
+                Professor.user_id == current_user.id,
+            ).first()
+            if not professor:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professor not found")
+            course.professor_id = professor.id
+    if body.personal_description is not None:
+        course.personal_description = (body.personal_description or "").strip() or None
+    db.commit()
+    db.refresh(course)
+    if course.professor:
+        db.refresh(course.professor)
+    return CourseResponse(
+        id=course.id,
+        official_name=course.official_name,
+        nickname=course.nickname,
+        professor_id=course.professor_id,
+        professor_name=course.professor.name if course.professor else None,
+        syllabus_file_path=course.syllabus_file_path,
+        personal_description=course.personal_description,
+        created_at=course.created_at,
+    )
 
 
 async def _save_upload(f: UploadFile, upload_dir: Path) -> str:

@@ -11,6 +11,10 @@ import Dashboard from './pages/Dashboard'
 import CreateGuide from './pages/CreateGuide'
 import GuideView from './pages/GuideView'
 import Settings from './pages/Settings'
+import ManageCourses from './pages/ManageCourses'
+import ManageProfessors from './pages/ManageProfessors'
+import EditCourse from './pages/EditCourse'
+import EditProfessor from './pages/EditProfessor'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -88,6 +92,38 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AppLayout><Settings /></AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/courses"
+        element={
+          <ProtectedRoute>
+            <AppLayout><ManageCourses /></AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/courses/:id"
+        element={
+          <ProtectedRoute>
+            <AppLayout><EditCourse /></AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/professors"
+        element={
+          <ProtectedRoute>
+            <AppLayout><ManageProfessors /></AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/professors/:id"
+        element={
+          <ProtectedRoute>
+            <AppLayout><EditProfessor /></AppLayout>
           </ProtectedRoute>
         }
       />
