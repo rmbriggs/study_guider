@@ -18,6 +18,8 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "https://localhost:5173",
         "https://127.0.0.1:5173",
+        "https://www.coursemind.app",
+        "https://coursemind.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],

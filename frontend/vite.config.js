@@ -3,23 +3,28 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import react from '@vitejs/plugin-react'
-import basicSsl from '@vitejs/plugin-basic-ssl'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Resolve certs from config location so it works regardless of cwd
 const certsDir = path.resolve(__dirname, 'certs')
 const keyPath = path.join(certsDir, 'key.pem')
 const certPath = path.join(certsDir, 'cert.pem')
-const useTrustedCerts = fs.existsSync(keyPath) && fs.existsSync(certPath)
 
-if (useTrustedCerts) {
-  console.log('[vite] Using trusted mkcert certificates for https://localhost:5173')
-} else {
-  console.log('[vite] No mkcert certs in frontend/certs/ - using self-signed (browser will warn)')
+// Only use HTTPS in local development. On Railway (NODE_ENV=production) always
+// serve plain HTTP — Railway's load balancer handles SSL termination.
+const isProduction = process.env.NODE_ENV === 'production'
+const useTrustedCerts = !isProduction && fs.existsSync(keyPath) && fs.existsSync(certPath)
+
+if (!isProduction) {
+  if (useTrustedCerts) {
+    console.log('[vite] Using trusted mkcert certificates for https://localhost:5173')
+  } else {
+    console.log('[vite] No mkcert certs in frontend/certs/ - running on plain HTTP (localhost:5173)')
+  }
 }
 
 export default defineConfig({
-  plugins: [react(), ...(useTrustedCerts ? [] : [basicSsl()])],
+  plugins: [react()],
   server: {
     port: 5173,
     ...(useTrustedCerts && {
@@ -34,5 +39,12 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  // Production preview server (used by Railway): plain HTTP, bind to all
+  // interfaces, and respect Railway's injected PORT.
+  preview: {
+    host: true,
+    port: process.env.PORT ? parseInt(process.env.PORT) : 4173,
+    https: false,
   },
 })
