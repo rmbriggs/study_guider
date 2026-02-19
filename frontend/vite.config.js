@@ -45,5 +45,6 @@ export default defineConfig({
   preview: {
     host: true,
     https: false,
+    allowedHosts: ['www.coursemind.app', 'coursemind.app'],
   },
 })
