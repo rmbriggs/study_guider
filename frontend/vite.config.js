@@ -40,11 +40,10 @@ export default defineConfig({
       },
     },
   },
-  // Production preview server (used by Railway): plain HTTP, bind to all
-  // interfaces, and respect Railway's injected PORT.
+  // Production preview server: plain HTTP, bind to all interfaces.
+  // PORT is passed explicitly via --port $PORT in the start script.
   preview: {
     host: true,
-    port: process.env.PORT ? parseInt(process.env.PORT) : 4173,
     https: false,
   },
 })
