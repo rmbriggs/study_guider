@@ -27,10 +27,14 @@ export default function ForgotPassword() {
 
   if (sent) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div className="card" style={{ maxWidth: 400, width: '100%' }}>
-          <h1 className="section-title" style={{ fontSize: 24, marginBottom: 8 }}>Check your email</h1>
-          <p className="section-subtitle" style={{ marginBottom: 24 }}>
+      <div className="auth-page">
+        <Link to="/" className="auth-page-brand">
+          <img src="/logo.png" alt="CourseMind" />
+          <span>CourseMind</span>
+        </Link>
+        <div className="auth-page-card">
+          <h1 className="section-title">Check your email</h1>
+          <p className="section-subtitle">
             If an account exists with that email, we sent password reset instructions.
           </p>
           <Link to="/login"><Button>Back to login</Button></Link>
@@ -40,10 +44,14 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div className="card" style={{ maxWidth: 400, width: '100%' }}>
-        <h1 className="section-title" style={{ fontSize: 24, marginBottom: 8 }}>Forgot password</h1>
-        <p className="section-subtitle" style={{ marginBottom: 24 }}>Enter your email and we'll send you a link to reset your password.</p>
+    <div className="auth-page">
+      <Link to="/" className="auth-page-brand">
+        <img src="/logo.png" alt="CourseMind" />
+        <span>CourseMind</span>
+      </Link>
+      <div className="auth-page-card">
+        <h1 className="section-title">Forgot password</h1>
+        <p className="section-subtitle">Enter your email and we'll send you a link to reset your password.</p>
         <form onSubmit={handleSubmit}>
           <Input
             label="Email"
@@ -60,7 +68,7 @@ export default function ForgotPassword() {
             {loading ? 'Sending…' : 'Send reset link'}
           </Button>
         </form>
-        <p style={{ marginTop: 24, fontSize: 14, color: 'var(--text-secondary)' }}>
+        <p style={{ marginTop: 20, fontSize: 14, color: 'var(--text-secondary)' }}>
           <Link to="/login" style={{ color: 'var(--blue-bold)' }}>Back to login</Link>
         </p>
       </div>

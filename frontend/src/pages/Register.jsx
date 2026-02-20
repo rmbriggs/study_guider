@@ -41,10 +41,14 @@ export default function Register() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div className="card" style={{ maxWidth: 400, width: '100%' }}>
-        <h1 className="section-title" style={{ fontSize: 24, marginBottom: 8 }}>Sign up</h1>
-        <p className="section-subtitle" style={{ marginBottom: 24 }}>Create an account to save your study guides.</p>
+    <div className="auth-page">
+      <Link to="/" className="auth-page-brand">
+        <img src="/logo.png" alt="CourseMind" />
+        <span>CourseMind</span>
+      </Link>
+      <div className="auth-page-card">
+        <h1 className="section-title">Sign up</h1>
+        <p className="section-subtitle">Create an account to save your study guides.</p>
         <form onSubmit={handleSubmit}>
           {SIGNUP_FIELDS.map((field, index) => (
             <Input
@@ -64,7 +68,7 @@ export default function Register() {
             {loading ? 'Creating account…' : 'Sign up'}
           </Button>
         </form>
-        <p style={{ marginTop: 24, fontSize: 14, color: 'var(--text-secondary)' }}>
+        <p style={{ marginTop: 20, fontSize: 14, color: 'var(--text-secondary)' }}>
           Already have an account? <Link to="/login" style={{ color: 'var(--blue-bold)' }}>Log in</Link>
         </p>
       </div>

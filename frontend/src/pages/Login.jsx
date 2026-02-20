@@ -36,10 +36,14 @@ export default function Login() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div className="card" style={{ maxWidth: 400, width: '100%' }}>
-        <h1 className="section-title" style={{ fontSize: 24, marginBottom: 8 }}>Log in</h1>
-        <p className="section-subtitle" style={{ marginBottom: 24 }}>Welcome back to Study Guider.</p>
+    <div className="auth-page">
+      <Link to="/" className="auth-page-brand">
+        <img src="/logo.png" alt="CourseMind" />
+        <span>CourseMind</span>
+      </Link>
+      <div className="auth-page-card">
+        <h1 className="section-title">Log in</h1>
+        <p className="section-subtitle">Welcome back to CourseMind.</p>
         <form onSubmit={handleSubmit}>
           <Input
             label="Email"
@@ -61,13 +65,13 @@ export default function Login() {
             autoComplete="current-password"
             style={{ marginBottom: 24 }}
           />
-          {successMessage && <div style={{ marginBottom: 16, color: 'var(--green)', fontSize: 14 }}>{successMessage}</div>}
+          {successMessage && <div style={{ marginBottom: 16, color: 'var(--color-success)', fontSize: 14 }}>{successMessage}</div>}
           {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
           <Button type="submit" disabled={loading} style={{ width: '100%' }}>
             {loading ? 'Logging in…' : 'Log in'}
           </Button>
         </form>
-        <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-secondary)' }}>
+        <p style={{ marginTop: 20, fontSize: 14, color: 'var(--text-secondary)' }}>
           <Link to="/forgot-password" style={{ color: 'var(--blue-bold)' }}>Forgot password?</Link>
         </p>
         <p style={{ marginTop: 8, fontSize: 14, color: 'var(--text-secondary)' }}>

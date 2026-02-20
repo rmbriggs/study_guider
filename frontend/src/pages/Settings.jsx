@@ -72,7 +72,7 @@ export default function Settings() {
       <div className="card" style={{ maxWidth: 560, marginBottom: 32 }}>
         <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Appearance</h2>
         <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16 }}>
-          Choose how Study Guider looks. Dark theme uses warm charcoal tones for a cozy feel.
+          Choose how CourseMind looks. Dark theme uses warm charcoal tones for a cozy feel.
         </p>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <button

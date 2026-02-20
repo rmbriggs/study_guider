@@ -1,4 +1,4 @@
-# Study Guider
+# CourseMind
 
 Generate study guides from professor handouts, notes, previous tests, and your specifications. React frontend + FastAPI backend.
 

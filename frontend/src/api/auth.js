@@ -1,7 +1,7 @@
 import { api, setAuthToken } from './client'
 
 export { setAuthToken }
-const STORAGE_KEY = 'study_guider_token'
+const STORAGE_KEY = 'coursemind_token'
 
 export async function login(email, password) {
   const { data } = await api.post('/auth/login', { email, password })

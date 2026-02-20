@@ -10,7 +10,7 @@ from app.config import get_settings
 settings = get_settings()
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Study Guider API", version="1.0.0")
+app = FastAPI(title="CourseMind API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

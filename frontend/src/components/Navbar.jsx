@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { BookOpen } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Navbar() {
@@ -8,10 +7,8 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <Link to="/" className="nav-logo">
-        <div className="nav-logo-icon">
-          <BookOpen size={18} />
-        </div>
-        Study Guider
+        <img src="/logo.png" alt="CourseMind" className="nav-logo-img" />
+        CourseMind
       </Link>
       <div className="nav-links">
         {user && (

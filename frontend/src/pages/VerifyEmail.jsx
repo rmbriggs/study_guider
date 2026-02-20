@@ -66,13 +66,17 @@ export default function VerifyEmail() {
 
   if (tokenFromUrl) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div className="card" style={{ maxWidth: 400, width: '100%' }}>
+      <div className="auth-page">
+        <Link to="/" className="auth-page-brand">
+          <img src="/logo.png" alt="CourseMind" />
+          <span>CourseMind</span>
+        </Link>
+        <div className="auth-page-card">
           {loading ? (
             <p style={{ color: 'var(--text-secondary)' }}>Verifying your email…</p>
           ) : error ? (
             <>
-              <p className="section-title" style={{ marginBottom: 8 }}>Verification failed</p>
+              <h1 className="section-title">Verification failed</h1>
               <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>
               <Link to="/login"><Button>Go to login</Button></Link>
             </>
@@ -84,8 +88,12 @@ export default function VerifyEmail() {
 
   if (!user) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div className="card" style={{ maxWidth: 400, width: '100%' }}>
+      <div className="auth-page">
+        <Link to="/" className="auth-page-brand">
+          <img src="/logo.png" alt="CourseMind" />
+          <span>CourseMind</span>
+        </Link>
+        <div className="auth-page-card">
           <p className="section-subtitle" style={{ marginBottom: 16 }}>Log in to verify your email or use the link from your verification email.</p>
           <Link to="/login"><Button>Log in</Button></Link>
         </div>
@@ -94,10 +102,14 @@ export default function VerifyEmail() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div className="card" style={{ maxWidth: 400, width: '100%' }}>
-        <h1 className="section-title" style={{ fontSize: 24, marginBottom: 8 }}>Verify your email</h1>
-        <p className="section-subtitle" style={{ marginBottom: 24 }}>
+    <div className="auth-page">
+      <Link to="/" className="auth-page-brand">
+        <img src="/logo.png" alt="CourseMind" />
+        <span>CourseMind</span>
+      </Link>
+      <div className="auth-page-card">
+        <h1 className="section-title">Verify your email</h1>
+        <p className="section-subtitle">
           We sent a 6-digit code to <strong>{user.email}</strong>. Enter it below, or use the link in the email.
         </p>
         <form onSubmit={handleSubmitCode}>
@@ -110,7 +122,7 @@ export default function VerifyEmail() {
             style={{ marginBottom: 16 }}
           />
           {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
-          {success && <div style={{ marginBottom: 16, color: 'var(--green)', fontSize: 14 }}>{success}</div>}
+          {success && <div style={{ marginBottom: 16, color: 'var(--color-success)', fontSize: 14 }}>{success}</div>}
           <Button type="submit" disabled={loading || code.length !== 6} style={{ width: '100%', marginBottom: 12 }}>
             {loading ? 'Verifying…' : 'Verify'}
           </Button>
@@ -121,7 +133,7 @@ export default function VerifyEmail() {
             {resendLoading ? 'Sending…' : 'Resend verification email'}
           </button>
         </p>
-        <p style={{ marginTop: 24, fontSize: 14, color: 'var(--text-secondary)' }}>
+        <p style={{ marginTop: 20, fontSize: 14, color: 'var(--text-secondary)' }}>
           <Link to="/" style={{ color: 'var(--blue-bold)' }}>Back to dashboard</Link>
         </p>
       </div>
