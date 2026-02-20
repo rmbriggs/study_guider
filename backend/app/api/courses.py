@@ -1,11 +1,12 @@
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.models.user import User
-from app.models.course import Professor, Course, CourseAttachment, CourseAttachmentType
+from app.models.course import Professor, Course, CourseTest, CourseAttachment, CourseAttachmentType
 from app.schemas.courses import (
     ProfessorResponse,
     ProfessorCreate,
@@ -14,6 +15,12 @@ from app.schemas.courses import (
     CourseResponse,
     CourseCreateResponse,
     CourseUpdate,
+    CourseTestResponse,
+    CourseTestCreate,
+    CourseTestUpdate,
+    CourseAttachmentResponse,
+    CourseMaterialsResponse,
+    AttachmentUpdate,
 )
 from app.api.deps import get_current_user
 
@@ -106,6 +113,144 @@ def update_professor(
 
 
 # ---- Courses ----
+def _get_course_or_404(course_id: int, user_id: int, db: Session) -> Course:
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.user_id == user_id,
+    ).first()
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    return course
+
+
+@router.get("/{course_id}/materials", response_model=CourseMaterialsResponse)
+def get_course_materials(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    course = _get_course_or_404(course_id, current_user.id, db)
+    tests = db.query(CourseTest).filter(CourseTest.course_id == course_id).order_by(CourseTest.sort_order, CourseTest.name).all()
+    attachments = db.query(CourseAttachment).filter(CourseAttachment.course_id == course_id).all()
+    return CourseMaterialsResponse(
+        tests=[CourseTestResponse.model_validate(t) for t in tests],
+        attachments=[CourseAttachmentResponse.model_validate(a) for a in attachments],
+    )
+
+
+@router.post("/{course_id}/tests", response_model=CourseTestResponse)
+def create_test(
+    course_id: int,
+    body: CourseTestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    course = _get_course_or_404(course_id, current_user.id, db)
+    name = (body.name or "").strip() or "Untitled section"
+    max_order = db.query(CourseTest).filter(CourseTest.course_id == course_id).count()
+    sort_order = body.sort_order if body.sort_order is not None else max_order
+    test = CourseTest(course_id=course_id, name=name, sort_order=sort_order)
+    db.add(test)
+    db.commit()
+    db.refresh(test)
+    return test
+
+
+@router.patch("/{course_id}/tests/{test_id}", response_model=CourseTestResponse)
+def update_test(
+    course_id: int,
+    test_id: int,
+    body: CourseTestUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_course_or_404(course_id, current_user.id, db)
+    test = db.query(CourseTest).filter(
+        CourseTest.id == test_id,
+        CourseTest.course_id == course_id,
+    ).first()
+    if not test:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test section not found")
+    if body.name is not None:
+        test.name = (body.name or "").strip() or test.name
+    if body.sort_order is not None:
+        test.sort_order = body.sort_order
+    db.commit()
+    db.refresh(test)
+    return test
+
+
+@router.delete("/{course_id}/tests/{test_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_test(
+    course_id: int,
+    test_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_course_or_404(course_id, current_user.id, db)
+    test = db.query(CourseTest).filter(
+        CourseTest.id == test_id,
+        CourseTest.course_id == course_id,
+    ).first()
+    if not test:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test section not found")
+    for att in test.attachments:
+        att.test_id = None
+    db.delete(test)
+    db.commit()
+
+
+@router.patch("/{course_id}/attachments/{attachment_id}", response_model=CourseAttachmentResponse)
+def update_attachment(
+    course_id: int,
+    attachment_id: int,
+    body: AttachmentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_course_or_404(course_id, current_user.id, db)
+    att = db.query(CourseAttachment).filter(
+        CourseAttachment.id == attachment_id,
+        CourseAttachment.course_id == course_id,
+    ).first()
+    if not att:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+    if body.test_id is not None:
+        if body.test_id is None or body.test_id == 0:
+            att.test_id = None
+        else:
+            t = db.query(CourseTest).filter(
+                CourseTest.id == body.test_id,
+                CourseTest.course_id == course_id,
+            ).first()
+            if not t:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test section not found")
+            att.test_id = t.id
+    db.commit()
+    db.refresh(att)
+    return att
+
+
+@router.get("/{course_id}/attachments/{attachment_id}/file")
+def get_attachment_file(
+    course_id: int,
+    attachment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_course_or_404(course_id, current_user.id, db)
+    att = db.query(CourseAttachment).filter(
+        CourseAttachment.id == attachment_id,
+        CourseAttachment.course_id == course_id,
+    ).first()
+    if not att:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+    path = Path(att.file_path)
+    if not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return FileResponse(path, filename=att.file_name, media_type="application/octet-stream")
+
+
 @router.get("", response_model=list[CourseListItem])
 def list_my_courses(
     db: Session = Depends(get_db),
@@ -129,12 +274,7 @@ def get_course(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    course = db.query(Course).filter(
-        Course.id == course_id,
-        Course.user_id == current_user.id,
-    ).first()
-    if not course:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    course = _get_course_or_404(course_id, current_user.id, db)
     return CourseResponse(
         id=course.id,
         official_name=course.official_name,
@@ -278,6 +418,7 @@ async def create_course(
     db.refresh(course)
 
     course_upload_dir = _ensure_upload_dir(COURSE_FILES_SUBDIR)
+    sort_order = 0
     for upload_file, kind in all_extra:
         ext = Path(upload_file.filename).suffix.lstrip(".").lower()
         if ext not in ALLOWED:
@@ -288,8 +429,21 @@ async def create_course(
         safe_name = f"{uuid.uuid4().hex}_{upload_file.filename}"[:200]
         path = course_upload_dir / safe_name
         path.write_bytes(content)
+        test_id = None
+        if kind == CourseAttachmentType.PAST_TEST:
+            section_name = (Path(upload_file.filename).stem or "Past test").strip()[:255]
+            course_test = CourseTest(
+                course_id=course.id,
+                name=section_name or "Past test",
+                sort_order=sort_order,
+            )
+            db.add(course_test)
+            db.flush()
+            test_id = course_test.id
+            sort_order += 1
         att = CourseAttachment(
             course_id=course.id,
+            test_id=test_id,
             file_name=upload_file.filename,
             file_type=ext,
             file_path=str(path),

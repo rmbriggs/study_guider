@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { GraduationCap, Plus } from 'lucide-react'
 import { getCourses } from '../api/courses'
 import Button from '../components/Button'
 import NewCourseModal from '../components/NewCourseModal'
 
 export default function ManageCourses() {
+  const navigate = useNavigate()
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -36,9 +37,10 @@ export default function ManageCourses() {
       <NewCourseModal
         open={newCourseOpen}
         onClose={() => setNewCourseOpen(false)}
-        onSuccess={() => {
+        onSuccess={(created) => {
           setNewCourseOpen(false)
           loadCourses()
+          if (created?.id) navigate(`/courses/${created.id}`)
         }}
       />
       {loading && <p style={{ color: 'var(--text-secondary)' }}>Loading courses…</p>}

@@ -23,19 +23,6 @@ class CourseAttachmentType:
     NOTE = "note"
 
 
-class CourseAttachment(Base):
-    __tablename__ = "course_attachments"
-
-    id = Column(Integer, primary_key=True, index=True)
-    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
-    file_name = Column(String(255), nullable=False)
-    file_type = Column(String(64), nullable=False)  # pdf, txt
-    file_path = Column(String(512), nullable=False)
-    attachment_kind = Column(String(32), nullable=False)  # handout, past_test, note
-
-    course = relationship("Course", back_populates="attachments")
-
-
 class Course(Base):
     __tablename__ = "courses"
 
@@ -51,3 +38,31 @@ class Course(Base):
     user = relationship("User", backref="courses")
     professor = relationship("Professor", back_populates="courses")
     attachments = relationship("CourseAttachment", back_populates="course", cascade="all, delete-orphan")
+    tests = relationship("CourseTest", back_populates="course", cascade="all, delete-orphan", order_by="CourseTest.sort_order")
+
+
+class CourseTest(Base):
+    __tablename__ = "course_tests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+
+    course = relationship("Course", back_populates="tests")
+    attachments = relationship("CourseAttachment", back_populates="test")
+
+
+class CourseAttachment(Base):
+    __tablename__ = "course_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    test_id = Column(Integer, ForeignKey("course_tests.id"), nullable=True)
+    file_name = Column(String(255), nullable=False)
+    file_type = Column(String(64), nullable=False)  # pdf, txt
+    file_path = Column(String(512), nullable=False)
+    attachment_kind = Column(String(32), nullable=False)  # handout, past_test, note
+
+    course = relationship("Course", back_populates="attachments")
+    test = relationship("CourseTest", back_populates="attachments")

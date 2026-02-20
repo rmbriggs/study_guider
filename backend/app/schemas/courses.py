@@ -64,3 +64,45 @@ class CourseUpdate(BaseModel):
     nickname: str | None = None
     professor_id: int | None = None
     personal_description: str | None = None
+
+
+# ---- Test sections (course materials) ----
+class CourseTestResponse(BaseModel):
+    id: int
+    course_id: int
+    name: str
+    sort_order: int
+
+    class Config:
+        from_attributes = True
+
+
+class CourseTestCreate(BaseModel):
+    name: str
+    sort_order: int | None = None
+
+
+class CourseTestUpdate(BaseModel):
+    name: str | None = None
+    sort_order: int | None = None
+
+
+class CourseAttachmentResponse(BaseModel):
+    id: int
+    course_id: int
+    test_id: int | None
+    file_name: str
+    file_type: str
+    attachment_kind: str
+
+    class Config:
+        from_attributes = True
+
+
+class CourseMaterialsResponse(BaseModel):
+    tests: list[CourseTestResponse]
+    attachments: list[CourseAttachmentResponse]
+
+
+class AttachmentUpdate(BaseModel):
+    test_id: int | None = None

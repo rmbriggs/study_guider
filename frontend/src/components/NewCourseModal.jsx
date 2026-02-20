@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, FileText, BookOpen, StickyNote } from 'lucide-react'
 import { getProfessors, createProfessor, createCourse } from '../api/courses'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -84,7 +85,7 @@ export default function NewCourseModal({ open, onClose, onSuccess }) {
 
   if (!open) return null
 
-  return (
+  const modal = (
     <div className="modal-backdrop" onClick={handleBackdropClick}>
       <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
@@ -242,4 +243,6 @@ export default function NewCourseModal({ open, onClose, onSuccess }) {
       </div>
     </div>
   )
+
+  return createPortal(modal, document.body)
 }
