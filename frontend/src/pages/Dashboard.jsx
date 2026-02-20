@@ -12,9 +12,17 @@ export default function Dashboard() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    setError('')
     getMyGuides()
-      .then(setGuides)
-      .catch(() => setError('Failed to load guides'))
+      .then((data) => setGuides(Array.isArray(data) ? data : []))
+      .catch((err) => {
+        const status = err.response?.status
+        if (status === 401) {
+          setError('Please log in to see your guides.')
+        } else {
+          setError('Couldn\'t load your guides. Check your connection and try again.')
+        }
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -51,7 +59,11 @@ export default function Dashboard() {
         </Link>
       </div>
       {loading && <p style={{ color: 'var(--text-secondary)' }}>Loading guides…</p>}
-      {error && <div className="error-msg">{error}</div>}
+      {error && (
+        <div className="error-msg" role="alert">
+          {error}
+        </div>
+      )}
       {!loading && !error && guides.length === 0 && (
         <div className="card animate-in delay-3" style={{ maxWidth: 400 }}>
           <div className="icon-badge-lg icon-badge ib-purple">
@@ -59,7 +71,7 @@ export default function Dashboard() {
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>No guides yet</h2>
           <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
-            Upload handouts, notes, and past tests to generate your first study guide.
+            You don&apos;t have any study guides yet. Upload handouts, notes, and past tests to generate your first one.
           </p>
           <Link to="/create">
             <Button variant="accent">Create your first guide</Button>
