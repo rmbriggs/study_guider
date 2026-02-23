@@ -32,6 +32,11 @@ from app.api.deps import get_current_user
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
 
+
+def _normalize_email(email: str) -> str:
+    """Normalize email for storage and lookup (lowercase, strip) so one address cannot register twice."""
+    return email.strip().lower() if email else ""
+
 VERIFICATION_EXPIRY_HOURS = 24
 RESET_TOKEN_EXPIRY_MINUTES = 15
 
@@ -109,7 +114,8 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already taken",
         )
-    existing = db.query(User).filter(User.email == data.email).first()
+    email_normalized = _normalize_email(data.email)
+    existing = db.query(User).filter(func.lower(User.email) == email_normalized).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -117,7 +123,7 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
         )
     user = User(
         username=data.username.strip(),
-        email=data.email,
+        email=email_normalized,
         password_hash=hash_password(data.password),
         email_verified=False,
     )
@@ -138,7 +144,8 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(data: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == data.email).first()
+    email_normalized = _normalize_email(data.email)
+    user = db.query(User).filter(func.lower(User.email) == email_normalized).first()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -247,7 +254,8 @@ def resend_verification(
 
 @router.post("/forgot-password")
 def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == body.email).first()
+    email_normalized = _normalize_email(body.email)
+    user = db.query(User).filter(func.lower(User.email) == email_normalized).first()
     if user:
         db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id).delete()
         raw_token = secrets.token_urlsafe(32)
