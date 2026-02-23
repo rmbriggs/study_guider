@@ -267,6 +267,43 @@ a.nav-avatar:hover { opacity: 0.9; }
   margin: 40px 0;
 }
 
+/* Back link on detail pages (e.g. Edit course, Edit professor) */
+.page-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  transition: color 0.15s ease;
+}
+.page-back-link:hover {
+  color: var(--text-primary);
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+.form-hint {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.form-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-top: 8px;
+}
+
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -791,6 +828,14 @@ select.input { cursor: pointer; }
 
 [data-theme="dark"] .sidebar {
   border-right-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .page-back-link:hover {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .form-note {
+  background: var(--bg-secondary);
 }
 
 [data-theme="dark"] .card {

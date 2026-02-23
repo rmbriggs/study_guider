@@ -297,17 +297,17 @@ export default function EditCourse() {
 
   return (
     <div className="animate-in">
-      <div style={{ marginBottom: 24 }}>
-        <Link to="/courses" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', textDecoration: 'none', marginBottom: 16, fontSize: 14 }}>
+      <header style={{ marginBottom: 32 }}>
+        <Link to="/courses" className="page-back-link">
           <ArrowLeft size={18} />
           Back to courses
         </Link>
         <h1 className="section-title" style={{ marginBottom: 4 }}>{nickname}</h1>
         <p className="section-subtitle" style={{ marginBottom: 0 }}>{officialName}</p>
-      </div>
+      </header>
 
-      <div className="modal-panel" style={{ maxWidth: 640, marginBottom: 32 }}>
-        <h2 className="modal-title" style={{ marginBottom: 16 }}>Course details</h2>
+      <div className="card card-static" style={{ maxWidth: 560, marginBottom: 32 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20, color: 'var(--text-primary)' }}>Course details</h2>
         <form onSubmit={handleSubmit}>
           <Input
             label="Official course name"
@@ -333,37 +333,34 @@ export default function EditCourse() {
             />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
-              Syllabus
-            </label>
-            <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>
+            <span className="form-label">Syllabus</span>
+            <p className="form-note">
               File uploads cannot be changed here. Current syllabus is stored on the server.
             </p>
           </div>
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
-              Personal description (optional)
-            </label>
+          <div style={{ marginBottom: 24 }}>
+            <label className="form-label">Personal description (optional)</label>
             <textarea
               className="textarea"
               placeholder="Your notes about this course, what to focus on, etc."
               value={personalDescription}
               onChange={(e) => setPersonalDescription(e.target.value)}
-              rows={3}
+              rows={4}
+              style={{ marginTop: 0 }}
             />
           </div>
           {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-            <Button type="submit" variant="accent" disabled={loading}>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', paddingTop: 4 }}>
+            <Button type="submit" variant="accent" className="btn-accent" disabled={loading}>
               {loading ? 'Saving…' : 'Save changes'}
             </Button>
           </div>
         </form>
       </div>
 
-      <div style={{ maxWidth: 640 }}>
+      <div style={{ maxWidth: 560 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>Materials by test</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>Materials by test</h2>
           <Button variant="secondary" className="btn-secondary" onClick={() => setAddingSection((a) => !a)}>
             <Plus size={18} />
             Add test section
