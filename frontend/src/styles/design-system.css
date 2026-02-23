@@ -316,6 +316,17 @@ a.nav-avatar:hover { opacity: 0.9; }
   gap: 20px;
   margin-bottom: 32px;
 }
+.test-block-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 1100px) {
+  .test-block-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .test-block-grid { grid-template-columns: 1fr; }
+}
 .card {
   background: var(--surface-solid);
   border-radius: var(--radius-lg);

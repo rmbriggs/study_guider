@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.models.user import User
-from app.models.course import Professor, Course, CourseTest, CourseAttachment, CourseAttachmentType
+from app.models.course import Professor, Course, CourseTest, CourseAttachment, CourseAttachmentTest, CourseAttachmentType
 from app.schemas.courses import (
     ProfessorResponse,
     ProfessorCreate,
@@ -132,9 +132,31 @@ def get_course_materials(
     course = _get_course_or_404(course_id, current_user.id, db)
     tests = db.query(CourseTest).filter(CourseTest.course_id == course_id).order_by(CourseTest.sort_order, CourseTest.name).all()
     attachments = db.query(CourseAttachment).filter(CourseAttachment.course_id == course_id).all()
+    att_ids = [a.id for a in attachments]
+    links = (
+        db.query(CourseAttachmentTest)
+        .join(CourseTest, CourseAttachmentTest.test_id == CourseTest.id)
+        .filter(CourseTest.course_id == course_id)
+        .filter(CourseAttachmentTest.attachment_id.in_(att_ids) if att_ids else True)
+        .all()
+    )
+    test_ids_by_attachment: dict[int, list[int]] = {}
+    for l in links:
+        test_ids_by_attachment.setdefault(l.attachment_id, []).append(l.test_id)
+
+    attachment_models: list[CourseAttachmentResponse] = []
+    for a in attachments:
+        base = CourseAttachmentResponse.model_validate(a).model_dump()
+        ids = set(test_ids_by_attachment.get(a.id, []))
+        # Backward-compat: if the junction table isn't backfilled yet, fall back to legacy test_id.
+        if not ids and a.test_id is not None:
+            ids.add(a.test_id)
+        base["test_ids"] = sorted(ids)
+        attachment_models.append(CourseAttachmentResponse(**base))
+
     return CourseMaterialsResponse(
         tests=[CourseTestResponse.model_validate(t) for t in tests],
-        attachments=[CourseAttachmentResponse.model_validate(a) for a in attachments],
+        attachments=attachment_models,
     )
 
 
@@ -194,8 +216,12 @@ def delete_test(
     ).first()
     if not test:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test section not found")
+    # Legacy single-assignment: move attachments to Uncategorized.
     for att in test.attachments:
         att.test_id = None
+
+    # Multi-assignment: remove this test from any attachments assigned to it.
+    db.query(CourseAttachmentTest).filter(CourseAttachmentTest.test_id == test_id).delete(synchronize_session=False)
     db.delete(test)
     db.commit()
 
@@ -215,20 +241,46 @@ def update_attachment(
     ).first()
     if not att:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
-    if body.test_id is not None:
-        if body.test_id is None or body.test_id == 0:
-            att.test_id = None
-        else:
-            t = db.query(CourseTest).filter(
-                CourseTest.id == body.test_id,
+
+    def set_attachment_test_ids(test_ids: list[int]):
+        unique: list[int] = []
+        seen: set[int] = set()
+        for tid in test_ids:
+            if tid in seen:
+                continue
+            unique.append(tid)
+            seen.add(tid)
+
+        if unique:
+            rows = db.query(CourseTest).filter(
                 CourseTest.course_id == course_id,
-            ).first()
-            if not t:
+                CourseTest.id.in_(unique),
+            ).all()
+            if len(rows) != len(unique):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test section not found")
-            att.test_id = t.id
+
+        db.query(CourseAttachmentTest).filter(CourseAttachmentTest.attachment_id == att.id).delete(synchronize_session=False)
+        for tid in unique:
+            db.add(CourseAttachmentTest(attachment_id=att.id, test_id=tid))
+
+        # Keep legacy column aligned for now (first assigned test).
+        att.test_id = unique[0] if unique else None
+
+    if body.test_ids is not None:
+        set_attachment_test_ids(body.test_ids or [])
+    elif body.test_id is not None:
+        if body.test_id is None or body.test_id == 0:
+            set_attachment_test_ids([])
+        else:
+            set_attachment_test_ids([body.test_id])
+
     db.commit()
     db.refresh(att)
-    return att
+    link_rows = db.query(CourseAttachmentTest).filter(CourseAttachmentTest.attachment_id == att.id).all()
+    test_ids = sorted({r.test_id for r in link_rows} | ({att.test_id} if att.test_id is not None else set()))
+    base = CourseAttachmentResponse.model_validate(att).model_dump()
+    base["test_ids"] = test_ids
+    return CourseAttachmentResponse(**base)
 
 
 @router.delete("/{course_id}/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -368,6 +420,9 @@ async def add_course_files(
             attachment_kind=kind,
         )
         db.add(att)
+        db.flush()
+        if test_id is not None:
+            db.add(CourseAttachmentTest(attachment_id=att.id, test_id=test_id))
     db.commit()
     return {"ok": True, "added": len(all_extra)}
 
@@ -571,6 +626,9 @@ async def create_course(
             attachment_kind=kind,
         )
         db.add(att)
+        db.flush()
+        if test_id is not None:
+            db.add(CourseAttachmentTest(attachment_id=att.id, test_id=test_id))
     db.commit()
     if course.professor:
         db.refresh(course.professor)

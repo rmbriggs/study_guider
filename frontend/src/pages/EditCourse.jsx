@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, FileText, BookOpen, FileStack, Pencil, Plus, Download, Upload, Trash2 } from 'lucide-react'
+import { ArrowLeft, FileText, BookOpen, FileStack, Pencil, Plus, Download, Upload, Trash2, MoreVertical, GripVertical } from 'lucide-react'
+import { DndContext, useDraggable, useDroppable } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 import {
   getCourse,
   updateCourse,
@@ -34,11 +36,248 @@ function sortAttachments(attachments) {
   })
 }
 
-function SectionCard({
+function getAttachmentTestIds(att) {
+  if (Array.isArray(att?.test_ids) && att.test_ids.length > 0) return att.test_ids.filter((n) => typeof n === 'number')
+  if (att?.test_id == null) return []
+  return [att.test_id]
+}
+
+function AttachmentRow({
+  att,
+  fromTestId,
+  sectionNameById,
+  allowMultipleBlocks,
+  courseId,
+  moveLoading,
+  moveOptions,
+  onAssign,
+  onRemoveFromBlock,
+  onDeleteAttachment,
+  onReload,
+}) {
+  const Icon = ATTACHMENT_KIND_ICON[att.attachment_kind] || FileText
+  const label = ATTACHMENT_KIND_LABEL[att.attachment_kind] || att.attachment_kind
+  const [deleting, setDeleting] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuWrapRef = useRef(null)
+  const testIds = getAttachmentTestIds(att)
+  const alsoInNames = allowMultipleBlocks
+    ? testIds
+      .filter((tid) => tid != null && tid !== fromTestId)
+      .map((tid) => sectionNameById?.[tid])
+      .filter(Boolean)
+    : []
+
+  const draggableId = `att-${att.id}-from-${fromTestId ?? 'uncat'}`
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: draggableId,
+    data: { attachment: att, fromTestId },
+    disabled: !!moveLoading,
+  })
+  const dndStyle = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.65 : 1,
+  }
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onPointerDown = (e) => {
+      if (!menuWrapRef.current) return
+      if (menuWrapRef.current.contains(e.target)) return
+      setMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [menuOpen])
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '8px 0',
+        borderBottom: '1px solid var(--bg-tertiary)',
+        ...dndStyle,
+      }}
+    >
+      <span
+        {...attributes}
+        {...listeners}
+        style={{
+          width: 20,
+          height: 20,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--text-muted)',
+          cursor: moveLoading ? 'not-allowed' : 'grab',
+          flexShrink: 0,
+          userSelect: 'none',
+        }}
+        title="Drag"
+      >
+        <GripVertical size={16} />
+      </span>
+      <span
+        className="icon-badge ib-blue"
+        style={{ width: 30, height: 30, marginBottom: 0, flexShrink: 0 }}
+      >
+        <Icon size={15} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.file_name}>
+          {att.file_name}
+        </div>
+        {allowMultipleBlocks && alsoInNames.length > 0 && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            Also in: {alsoInNames.slice(0, 2).join(', ')}{alsoInNames.length > 2 ? ` +${alsoInNames.length - 2}` : ''}
+          </div>
+        )}
+      </div>
+      <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
+      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ padding: '4px 8px', fontSize: 13 }}
+          onClick={() => downloadAttachment(courseId, att.id, att.file_name)}
+          title="Download"
+        >
+          <Download size={14} />
+        </button>
+        {onDeleteAttachment && (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ padding: '4px 8px', fontSize: 13, color: 'var(--color-error)' }}
+            onClick={async () => {
+              if (!window.confirm(`Delete "${att.file_name}"? This cannot be undone.`)) return
+              setDeleting(true)
+              try {
+                await onDeleteAttachment(att.id)
+                onReload()
+              } finally {
+                setDeleting(false)
+              }
+            }}
+            disabled={deleting}
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
+      <div ref={menuWrapRef} style={{ position: 'relative', flexShrink: 0 }}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ padding: '4px 6px' }}
+          onClick={() => setMenuOpen((o) => !o)}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          disabled={!!moveLoading}
+          title="Assign to…"
+        >
+          <MoreVertical size={16} />
+        </button>
+        {menuOpen && (
+          <div
+            className="select-menu"
+            role="menu"
+            style={{ right: 0, left: 'auto', minWidth: 200 }}
+          >
+            <div style={{ padding: '6px 10px', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>
+              Assign to
+            </div>
+            {allowMultipleBlocks && fromTestId != null && testIds.includes(fromTestId) && (
+              <button
+                type="button"
+                className="select-option"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onRemoveFromBlock(att, fromTestId)
+                }}
+              >
+                Remove from this block
+              </button>
+            )}
+            {moveOptions.map((s) => (
+              <button
+                key={s.id ?? 'uncat'}
+                type="button"
+                className="select-option"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onAssign(att, s.id ?? null)
+                }}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </li>
+  )
+}
+
+function KindSection({
+  title,
+  attachments,
+  fromTestId,
+  sectionNameById,
+  allowMultipleBlocks,
+  courseId,
+  moveLoading,
+  moveOptions,
+  onAssign,
+  onRemoveFromBlock,
+  onDeleteAttachment,
+  onReload,
+}) {
+  const sorted = sortAttachments(attachments)
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>{title}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{sorted.length}</div>
+      </div>
+      {sorted.length === 0 ? (
+        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No files.</p>
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {sorted.map((att) => (
+            <AttachmentRow
+              key={att.id}
+              att={att}
+              fromTestId={fromTestId}
+              sectionNameById={sectionNameById}
+              allowMultipleBlocks={allowMultipleBlocks}
+              courseId={courseId}
+              moveLoading={moveLoading}
+              moveOptions={moveOptions}
+              onAssign={onAssign}
+              onRemoveFromBlock={onRemoveFromBlock}
+              onDeleteAttachment={onDeleteAttachment}
+              onReload={onReload}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function TestBlockCard({
   title,
   testId,
   attachments,
   allSections,
+  allowMultipleBlocks,
   courseId,
   onReload,
   onRename,
@@ -47,18 +286,39 @@ function SectionCard({
   isUncategorized,
 }) {
   const [moveLoading, setMoveLoading] = useState(null)
-  const [deletingAttId, setDeletingAttId] = useState(null)
   const [editingName, setEditingName] = useState(false)
   const [editNameValue, setEditNameValue] = useState(title)
+  const droppableId = testId == null ? 'uncat' : `test-${testId}`
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId })
 
-  const handleMove = async (attachmentId, newTestId) => {
-    setMoveLoading(attachmentId)
+  const sectionNameById = Object.fromEntries((allSections || []).filter((s) => s?.id != null).map((s) => [s.id, s.name]))
+
+  const setAttachmentTestIds = async (att, nextTestIds) => {
+    setMoveLoading(att.id)
     try {
-      await updateAttachment(courseId, attachmentId, { test_id: newTestId || null })
+      await updateAttachment(courseId, att.id, { test_ids: nextTestIds })
       onReload()
     } finally {
       setMoveLoading(null)
     }
+  }
+
+  const handleAssign = async (att, targetTestId) => {
+    const current = getAttachmentTestIds(att)
+    if (allowMultipleBlocks) {
+      if (targetTestId == null) {
+        await setAttachmentTestIds(att, [])
+        return
+      }
+      await setAttachmentTestIds(att, Array.from(new Set([...current, targetTestId])))
+      return
+    }
+    await setAttachmentTestIds(att, targetTestId == null ? [] : [targetTestId])
+  }
+
+  const handleRemoveFromBlock = async (att, removeTestId) => {
+    const current = getAttachmentTestIds(att)
+    await setAttachmentTestIds(att, current.filter((tid) => tid !== removeTestId))
   }
 
   const handleSaveName = async () => {
@@ -75,13 +335,22 @@ function SectionCard({
   }
 
   const moveOptions = allSections.filter((s) => s.id !== testId)
-  const sorted = sortAttachments(attachments)
+  const pastTests = (attachments || []).filter((a) => a.attachment_kind === 'past_test')
+  const handouts = (attachments || []).filter((a) => a.attachment_kind === 'handout')
+  const notes = (attachments || []).filter((a) => a.attachment_kind === 'note')
 
   return (
-    <div className="card card-static" style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+    <div
+      ref={setNodeRef}
+      className="card card-static"
+      style={{
+        outline: isOver ? '2px solid var(--blue-bold)' : 'none',
+        outlineOffset: 2,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
         {isUncategorized ? (
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h3>
         ) : editingName ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
             <input
@@ -97,104 +366,70 @@ function SectionCard({
             <Button variant="ghost" onClick={() => { setEditingName(false); setEditNameValue(title) }}>Cancel</Button>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {title}
+            </h3>
             <button
               type="button"
               onClick={() => { setEditNameValue(title); setEditingName(true) }}
               className="btn btn-ghost"
-              style={{ padding: 4 }}
+              style={{ padding: 4, flexShrink: 0 }}
               aria-label="Edit section name"
             >
               <Pencil size={14} />
             </button>
-            {onDelete && (
-              <Button variant="ghost" className="btn-danger" onClick={() => onDelete(testId)}>
-                Remove section
-              </Button>
-            )}
           </div>
         )}
+        {!isUncategorized && onDelete && !editingName && (
+          <Button variant="ghost" className="btn-danger" onClick={() => onDelete(testId)}>
+            Remove
+          </Button>
+        )}
       </div>
-      {sorted.length === 0 ? (
-        <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>No files in this section.</p>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {sorted.map((att) => {
-            const Icon = ATTACHMENT_KIND_ICON[att.attachment_kind] || FileText
-            const label = ATTACHMENT_KIND_LABEL[att.attachment_kind] || att.attachment_kind
-            return (
-              <li
-                key={att.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '10px 0',
-                  borderBottom: '1px solid var(--bg-tertiary)',
-                }}
-              >
-                <span
-                  className="icon-badge ib-blue"
-                  style={{ width: 32, height: 32, marginBottom: 0, flexShrink: 0 }}
-                >
-                  <Icon size={16} />
-                </span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 14 }} title={att.file_name}>
-                  {att.file_name}
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    style={{ padding: '4px 8px', fontSize: 13 }}
-                    onClick={() => downloadAttachment(courseId, att.id, att.file_name)}
-                    title="Download"
-                  >
-                    <Download size={14} />
-                  </button>
-                  {onDeleteAttachment && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      style={{ padding: '4px 8px', fontSize: 13, color: 'var(--color-error)' }}
-                      onClick={async () => {
-                        if (!window.confirm(`Delete "${att.file_name}"? This cannot be undone.`)) return
-                        setDeletingAttId(att.id)
-                        try {
-                          await onDeleteAttachment(att.id)
-                          onReload()
-                        } finally {
-                          setDeletingAttId(null)
-                        }
-                      }}
-                      disabled={deletingAttId === att.id}
-                      title="Delete"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-                <select
-                  className="input"
-                  style={{ width: 'auto', minWidth: 140, fontSize: 13 }}
-                  value={att.test_id ?? ''}
-                  disabled={!!moveLoading}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    handleMove(att.id, v === '' ? null : Number(v))
-                  }}
-                >
-                  {moveOptions.map((s) => (
-                    <option key={s.id ?? 'uncat'} value={s.id ?? ''}>{s.name}</option>
-                  ))}
-                </select>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+
+      <KindSection
+        title="Past tests"
+        attachments={pastTests}
+        fromTestId={testId}
+        sectionNameById={sectionNameById}
+        allowMultipleBlocks={allowMultipleBlocks}
+        courseId={courseId}
+        moveLoading={moveLoading}
+        moveOptions={moveOptions}
+        onAssign={handleAssign}
+        onRemoveFromBlock={handleRemoveFromBlock}
+        onDeleteAttachment={onDeleteAttachment}
+        onReload={onReload}
+      />
+      <KindSection
+        title="Handouts"
+        attachments={handouts}
+        fromTestId={testId}
+        sectionNameById={sectionNameById}
+        allowMultipleBlocks={allowMultipleBlocks}
+        courseId={courseId}
+        moveLoading={moveLoading}
+        moveOptions={moveOptions}
+        onAssign={handleAssign}
+        onRemoveFromBlock={handleRemoveFromBlock}
+        onDeleteAttachment={onDeleteAttachment}
+        onReload={onReload}
+      />
+      <KindSection
+        title="Notes"
+        attachments={notes}
+        fromTestId={testId}
+        sectionNameById={sectionNameById}
+        allowMultipleBlocks={allowMultipleBlocks}
+        courseId={courseId}
+        moveLoading={moveLoading}
+        moveOptions={moveOptions}
+        onAssign={handleAssign}
+        onRemoveFromBlock={handleRemoveFromBlock}
+        onDeleteAttachment={onDeleteAttachment}
+        onReload={onReload}
+      />
     </div>
   )
 }
@@ -224,6 +459,7 @@ export default function EditCourse() {
   const [addFilesNotes, setAddFilesNotes] = useState([])
   const [filesAddedMessage, setFilesAddedMessage] = useState('')
   const [deletingId, setDeletingId] = useState(null)
+  const [allowMultipleBlocks, setAllowMultipleBlocks] = useState(false)
   const handoutsInputRef = useRef(null)
   const pastTestsInputRef = useRef(null)
   const notesInputRef = useRef(null)
@@ -307,6 +543,38 @@ export default function EditCourse() {
     loadMaterials()
   }
 
+  const handleDragEnd = async ({ active, over }) => {
+    if (!over) return
+    const { attachment, fromTestId } = active.data?.current || {}
+    if (!attachment) return
+
+    const overId = over.id
+    let targetTestId = null
+    if (overId !== 'uncat') {
+      const s = String(overId)
+      if (s.startsWith('test-')) {
+        const n = Number(s.slice('test-'.length))
+        if (!Number.isNaN(n)) targetTestId = n
+      }
+    }
+
+    if ((fromTestId ?? null) === (targetTestId ?? null)) return
+
+    const current = getAttachmentTestIds(attachment)
+    let next = []
+    if (allowMultipleBlocks) {
+      next = current.filter((tid) => (fromTestId == null ? true : tid !== fromTestId))
+      if (targetTestId != null && !next.includes(targetTestId)) next = [...next, targetTestId]
+    } else {
+      next = targetTestId == null ? [] : [targetTestId]
+    }
+
+    try {
+      await updateAttachment(Number(id), attachment.id, { test_ids: next })
+      loadMaterials()
+    } catch (_) {}
+  }
+
   const handleAddSection = async () => {
     const name = (newSectionName || '').trim() || 'Untitled section'
     try {
@@ -371,7 +639,7 @@ export default function EditCourse() {
 
   const handleDeleteAttachment = (attachmentId) => deleteAttachment(courseId, attachmentId)
 
-  const uncategorizedAttachments = (materials.attachments || []).filter((a) => a.test_id == null)
+  const uncategorizedAttachments = (materials.attachments || []).filter((a) => getAttachmentTestIds(a).length === 0)
   const courseId = Number(id)
   const attachmentsByKind = {
     syllabus: syllabusFilePath ? [{ id: 'syllabus', file_name: 'Syllabus', attachment_kind: 'syllabus' }] : [],
@@ -620,10 +888,20 @@ export default function EditCourse() {
       <div style={{ maxWidth: 560 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
           <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>Materials by test</h2>
-          <Button variant="secondary" className="btn-secondary" onClick={() => setAddingSection((a) => !a)}>
-            <Plus size={18} />
-            Add test section
-          </Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-secondary)' }}>
+              <input
+                type="checkbox"
+                checked={allowMultipleBlocks}
+                onChange={(e) => setAllowMultipleBlocks(e.target.checked)}
+              />
+              Allow multiple blocks
+            </label>
+            <Button variant="secondary" className="btn-secondary" onClick={() => setAddingSection((a) => !a)}>
+              <Plus size={18} />
+              Add test section
+            </Button>
+          </div>
         </div>
         {addingSection && (
           <div className="card card-static" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -640,34 +918,39 @@ export default function EditCourse() {
         {materialsLoading ? (
           <p style={{ color: 'var(--text-secondary)' }}>Loading materials…</p>
         ) : (
-          <>
-            <SectionCard
+          <DndContext onDragEnd={handleDragEnd}>
+            <div className="test-block-grid" style={{ marginBottom: 16 }}>
+              {(materials.tests || []).map((test) => (
+                <TestBlockCard
+                  key={test.id}
+                  title={test.name}
+                  testId={test.id}
+                  attachments={(materials.attachments || []).filter((a) => getAttachmentTestIds(a).includes(test.id))}
+                  allSections={[{ id: null, name: 'Uncategorized' }, ...(materials.tests || [])]}
+                  allowMultipleBlocks={allowMultipleBlocks}
+                  courseId={courseId}
+                  onReload={loadMaterials}
+                  onRename={handleRenameSection}
+                  onDelete={handleDeleteSection}
+                  onDeleteAttachment={handleDeleteAttachment}
+                  isUncategorized={false}
+                />
+              ))}
+            </div>
+
+            <TestBlockCard
               title="Uncategorized"
               testId={null}
               attachments={uncategorizedAttachments}
               allSections={[{ id: null, name: 'Uncategorized' }, ...(materials.tests || [])]}
+              allowMultipleBlocks={allowMultipleBlocks}
               courseId={courseId}
               onReload={loadMaterials}
               onRename={() => {}}
               onDeleteAttachment={handleDeleteAttachment}
               isUncategorized
             />
-            {(materials.tests || []).map((test) => (
-              <SectionCard
-                key={test.id}
-                title={test.name}
-                testId={test.id}
-                attachments={(materials.attachments || []).filter((a) => a.test_id === test.id)}
-                allSections={[{ id: null, name: 'Uncategorized' }, ...(materials.tests || [])]}
-                courseId={courseId}
-                onReload={loadMaterials}
-                onRename={handleRenameSection}
-                onDelete={handleDeleteSection}
-                onDeleteAttachment={handleDeleteAttachment}
-                isUncategorized={false}
-              />
-            ))}
-          </>
+          </DndContext>
         )}
       </div>
     </div>

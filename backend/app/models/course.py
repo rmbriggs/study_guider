@@ -51,6 +51,17 @@ class CourseTest(Base):
 
     course = relationship("Course", back_populates="tests")
     attachments = relationship("CourseAttachment", back_populates="test")
+    attachment_links = relationship("CourseAttachmentTest", back_populates="test", cascade="all, delete-orphan")
+
+
+class CourseAttachmentTest(Base):
+    __tablename__ = "course_attachment_tests"
+
+    attachment_id = Column(Integer, ForeignKey("course_attachments.id"), primary_key=True, index=True)
+    test_id = Column(Integer, ForeignKey("course_tests.id"), primary_key=True, index=True)
+
+    attachment = relationship("CourseAttachment", back_populates="test_links")
+    test = relationship("CourseTest", back_populates="attachment_links")
 
 
 class CourseAttachment(Base):
@@ -66,3 +77,4 @@ class CourseAttachment(Base):
 
     course = relationship("Course", back_populates="attachments")
     test = relationship("CourseTest", back_populates="attachments")
+    test_links = relationship("CourseAttachmentTest", back_populates="attachment", cascade="all, delete-orphan")
