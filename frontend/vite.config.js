@@ -48,7 +48,7 @@ export default defineConfig({
     allowedHosts: ['www.coursemind.app', 'coursemind.app'],
     proxy: {
       '/api': {
-        target: process.env.RAILWAY_BACKEND_URL || 'http://unique-mindfulness.railway.internal',
+        target: process.env.RAILWAY_BACKEND_URL || 'https://unique-mindfulness-production.up.railway.app',
         changeOrigin: true,
       },
     },
