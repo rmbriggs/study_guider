@@ -95,6 +95,7 @@ class CourseAttachmentResponse(BaseModel):
     file_name: str
     file_type: str
     attachment_kind: str
+    allow_multiple_blocks: bool = False
 
     class Config:
         from_attributes = True
@@ -109,3 +110,4 @@ class AttachmentUpdate(BaseModel):
     test_id: int | None = None
     test_ids: list[int] | None = None
     file_name: str | None = None
+    allow_multiple_blocks: bool | None = None

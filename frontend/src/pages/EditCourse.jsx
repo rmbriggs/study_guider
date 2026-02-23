@@ -46,23 +46,25 @@ function AttachmentRow({
   att,
   fromTestId,
   sectionNameById,
-  allowMultipleBlocks,
   courseId,
   moveLoading,
   moveOptions,
   onAssign,
   onRemoveFromBlock,
   onRename,
+  onToggleMultiBlock,
   onDeleteAttachment,
   onReload,
 }) {
   const Icon = ATTACHMENT_KIND_ICON[att.attachment_kind] || FileText
   const label = ATTACHMENT_KIND_LABEL[att.attachment_kind] || att.attachment_kind
+  const allowMultipleBlocks = !!att.allow_multiple_blocks
   const [deleting, setDeleting] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [editNameValue, setEditNameValue] = useState(att.file_name)
   const [renameLoading, setRenameLoading] = useState(false)
+  const [togglingMulti, setTogglingMulti] = useState(false)
   const menuWrapRef = useRef(null)
   const testIds = getAttachmentTestIds(att)
   const alsoInNames = allowMultipleBlocks
@@ -183,6 +185,25 @@ function AttachmentRow({
         )}
       </div>
       <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
+      {onToggleMultiBlock && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, fontSize: 12, color: 'var(--text-secondary)', cursor: togglingMulti ? 'wait' : 'pointer' }} title="Allow this file in multiple blocks">
+          <input
+            type="checkbox"
+            checked={allowMultipleBlocks}
+            disabled={togglingMulti}
+            onChange={async () => {
+              setTogglingMulti(true)
+              try {
+                await onToggleMultiBlock(att)
+                onReload()
+              } finally {
+                setTogglingMulti(false)
+              }
+            }}
+          />
+          <span>Multi</span>
+        </label>
+      )}
       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
         <button
           type="button"
@@ -290,13 +311,13 @@ function KindSection({
   attachments,
   fromTestId,
   sectionNameById,
-  allowMultipleBlocks,
   courseId,
   moveLoading,
   moveOptions,
   onAssign,
   onRemoveFromBlock,
   onRename,
+  onToggleMultiBlock,
   onDeleteAttachment,
   onReload,
 }) {
@@ -317,13 +338,13 @@ function KindSection({
               att={att}
               fromTestId={fromTestId}
               sectionNameById={sectionNameById}
-              allowMultipleBlocks={allowMultipleBlocks}
               courseId={courseId}
               moveLoading={moveLoading}
               moveOptions={moveOptions}
               onAssign={onAssign}
               onRemoveFromBlock={onRemoveFromBlock}
               onRename={onRename}
+              onToggleMultiBlock={onToggleMultiBlock}
               onDeleteAttachment={onDeleteAttachment}
               onReload={onReload}
             />
@@ -339,7 +360,6 @@ function TestBlockCard({
   testId,
   attachments,
   allSections,
-  allowMultipleBlocks,
   courseId,
   onReload,
   onRename,
@@ -367,7 +387,7 @@ function TestBlockCard({
 
   const handleAssign = async (att, targetTestId) => {
     const current = getAttachmentTestIds(att)
-    if (allowMultipleBlocks) {
+    if (att.allow_multiple_blocks) {
       if (targetTestId == null) {
         await setAttachmentTestIds(att, [])
         return
@@ -385,6 +405,11 @@ function TestBlockCard({
 
   const handleRenameAttachment = async (att, newName) => {
     await updateAttachment(courseId, att.id, { file_name: newName })
+    onReload()
+  }
+
+  const handleToggleMultiBlock = async (att) => {
+    await updateAttachment(courseId, att.id, { allow_multiple_blocks: !att.allow_multiple_blocks })
     onReload()
   }
 
@@ -460,13 +485,13 @@ function TestBlockCard({
         attachments={pastTests}
         fromTestId={testId}
         sectionNameById={sectionNameById}
-        allowMultipleBlocks={allowMultipleBlocks}
         courseId={courseId}
         moveLoading={moveLoading}
         moveOptions={moveOptions}
         onAssign={handleAssign}
         onRemoveFromBlock={handleRemoveFromBlock}
         onRename={handleRenameAttachment}
+        onToggleMultiBlock={handleToggleMultiBlock}
         onDeleteAttachment={onDeleteAttachment}
         onReload={onReload}
       />
@@ -475,13 +500,13 @@ function TestBlockCard({
         attachments={handouts}
         fromTestId={testId}
         sectionNameById={sectionNameById}
-        allowMultipleBlocks={allowMultipleBlocks}
         courseId={courseId}
         moveLoading={moveLoading}
         moveOptions={moveOptions}
         onAssign={handleAssign}
         onRemoveFromBlock={handleRemoveFromBlock}
         onRename={handleRenameAttachment}
+        onToggleMultiBlock={handleToggleMultiBlock}
         onDeleteAttachment={onDeleteAttachment}
         onReload={onReload}
       />
@@ -490,13 +515,13 @@ function TestBlockCard({
         attachments={notes}
         fromTestId={testId}
         sectionNameById={sectionNameById}
-        allowMultipleBlocks={allowMultipleBlocks}
         courseId={courseId}
         moveLoading={moveLoading}
         moveOptions={moveOptions}
         onAssign={handleAssign}
         onRemoveFromBlock={handleRemoveFromBlock}
         onRename={handleRenameAttachment}
+        onToggleMultiBlock={handleToggleMultiBlock}
         onDeleteAttachment={onDeleteAttachment}
         onReload={onReload}
       />
@@ -531,7 +556,6 @@ export default function EditCourse() {
   const [deletingId, setDeletingId] = useState(null)
   const [renamingFileId, setRenamingFileId] = useState(null)
   const [renamingFileValue, setRenamingFileValue] = useState('')
-  const [allowMultipleBlocks, setAllowMultipleBlocks] = useState(false)
   const handoutsInputRef = useRef(null)
   const pastTestsInputRef = useRef(null)
   const notesInputRef = useRef(null)
@@ -634,7 +658,7 @@ export default function EditCourse() {
 
     const current = getAttachmentTestIds(attachment)
     let next = []
-    if (allowMultipleBlocks) {
+    if (attachment.allow_multiple_blocks) {
       next = current.filter((tid) => (fromTestId == null ? true : tid !== fromTestId))
       if (targetTestId != null && !next.includes(targetTestId)) next = [...next, targetTestId]
     } else {
@@ -1004,20 +1028,10 @@ export default function EditCourse() {
       <div style={{ maxWidth: 1200, width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
           <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>Materials by test</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-secondary)' }}>
-              <input
-                type="checkbox"
-                checked={allowMultipleBlocks}
-                onChange={(e) => setAllowMultipleBlocks(e.target.checked)}
-              />
-              Allow multiple blocks
-            </label>
-            <Button variant="secondary" className="btn-secondary" onClick={() => setAddingSection((a) => !a)}>
-              <Plus size={18} />
-              Add test section
-            </Button>
-          </div>
+          <Button variant="secondary" className="btn-secondary" onClick={() => setAddingSection((a) => !a)}>
+            <Plus size={18} />
+            Add test section
+          </Button>
         </div>
         {addingSection && (
           <div className="card card-static" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -1043,7 +1057,6 @@ export default function EditCourse() {
                   testId={test.id}
                   attachments={(materials.attachments || []).filter((a) => getAttachmentTestIds(a).includes(test.id))}
                   allSections={[{ id: null, name: 'Uncategorized' }, ...(materials.tests || [])]}
-                  allowMultipleBlocks={allowMultipleBlocks}
                   courseId={courseId}
                   onReload={loadMaterials}
                   onRename={handleRenameSection}
@@ -1059,7 +1072,6 @@ export default function EditCourse() {
               testId={null}
               attachments={uncategorizedAttachments}
               allSections={[{ id: null, name: 'Uncategorized' }, ...(materials.tests || [])]}
-              allowMultipleBlocks={allowMultipleBlocks}
               courseId={courseId}
               onReload={loadMaterials}
               onRename={() => {}}

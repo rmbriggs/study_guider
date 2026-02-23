@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db import Base
@@ -74,6 +74,7 @@ class CourseAttachment(Base):
     file_type = Column(String(64), nullable=False)  # pdf, txt
     file_path = Column(String(512), nullable=False)
     attachment_kind = Column(String(32), nullable=False)  # handout, past_test, note
+    allow_multiple_blocks = Column(Boolean, nullable=False, default=False)
 
     course = relationship("Course", back_populates="attachments")
     test = relationship("CourseTest", back_populates="attachments")

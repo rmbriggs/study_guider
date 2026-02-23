@@ -152,6 +152,7 @@ def get_course_materials(
         if not ids and a.test_id is not None:
             ids.add(a.test_id)
         base["test_ids"] = sorted(ids)
+        base["allow_multiple_blocks"] = getattr(a, "allow_multiple_blocks", False)
         attachment_models.append(CourseAttachmentResponse(**base))
 
     return CourseMaterialsResponse(
@@ -250,6 +251,9 @@ def update_attachment(
                 detail="File name cannot be empty",
             )
         att.file_name = name[:255]
+
+    if body.allow_multiple_blocks is not None:
+        att.allow_multiple_blocks = body.allow_multiple_blocks
 
     def set_attachment_test_ids(test_ids: list[int]):
         unique: list[int] = []
