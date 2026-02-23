@@ -6,7 +6,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.models.user import User
 from app.models.guide import StudyGuide, GuideSource, StudyGuideOutput, GuideStatus
-from app.models.course import Course, Professor
+from app.models.course import Course, Professor, CourseAttachment
 from app.schemas.guides import (
     StudyGuideResponse,
     StudyGuideListItem,
@@ -125,18 +125,45 @@ async def create_guide(
     course: str = Form(""),
     professor_name: str = Form(""),
     user_specs: str | None = Form(None),
-    files: list[UploadFile] = File(default=[]),
+    past_tests: list[UploadFile] = File(default=[]),
+    handouts: list[UploadFile] = File(default=[]),
+    study_guides: list[UploadFile] = File(default=[]),
+    notes: list[UploadFile] = File(default=[]),
 ):
     if not getattr(current_user, "email_verified", False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Please verify your email address to create study guides.",
         )
-    if len(files) > MAX_FILES:
+
+    # Pair each upload with its material type, past_tests first (highest priority)
+    typed_uploads: list[tuple[UploadFile, str]] = (
+        [(f, "past_test")   for f in past_tests   if f.filename] +
+        [(f, "handout")     for f in handouts      if f.filename] +
+        [(f, "note")        for f in notes         if f.filename] +
+        [(f, "study_guide") for f in study_guides  if f.filename]
+    )
+    if len(typed_uploads) > MAX_FILES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Maximum {MAX_FILES} files allowed",
         )
+
+    # Look up the professor's full profile so it can be injected into the system prompt
+    professor_profile: dict | None = None
+    if professor_name:
+        prof = (
+            db.query(Professor)
+            .filter(Professor.user_id == current_user.id, Professor.name == professor_name)
+            .first()
+        )
+        if prof:
+            professor_profile = {
+                "name": prof.name,
+                "specialties": prof.specialties,
+                "description": prof.description,
+            }
+
     upload_dir = _ensure_upload_dir()
     guide = StudyGuide(
         user_id=current_user.id,
@@ -149,12 +176,12 @@ async def create_guide(
     db.add(guide)
     db.commit()
     db.refresh(guide)
-    source_sections: list[tuple[str, str]] = []
+
+    # (material_type, label, text) — order matters: past_tests feed first into the prompt
+    typed_sources: list[tuple[str, str, str]] = []
     saved_paths: list[Path] = []
     try:
-        for f in files:
-            if not f.filename:
-                continue
+        for f, material_type in typed_uploads:
             ext = Path(f.filename).suffix.lstrip(".").lower()
             if ext not in ALLOWED:
                 raise HTTPException(
@@ -178,16 +205,19 @@ async def create_guide(
                 file_type=ext,
                 file_path=str(path),
                 extracted_text=text,
+                material_type=material_type,
             )
             db.add(source)
             db.commit()
-            source_sections.append((f.filename, text or "(no text extracted)"))
+            typed_sources.append((material_type, f.filename, text or "(no text extracted)"))
+
         api_key = settings.gemini_api_key
         content, model_used = generate_study_guide(
             course=getattr(guide, "course", "") or "",
             professor_name=guide.professor_name,
             user_specs=guide.user_specs,
-            source_sections=source_sections,
+            typed_sources=typed_sources,
+            professor_profile=professor_profile,
             api_key=api_key,
         )
         output = StudyGuideOutput(

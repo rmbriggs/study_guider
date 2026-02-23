@@ -1,39 +1,214 @@
-SYSTEM_PROMPT = """You are a study guide generator. Given materials from professor handouts, notes, previous tests, and user preferences, produce a clear, structured study guide in Markdown.
+"""
+LLM service for study guide generation.
 
-Include:
-- A brief overview
-- Section headings for major topics
-- Key points, definitions, and concepts
-- Possible exam topics or question types if the materials suggest them
-- Concise summaries where helpful
+Prompt architecture:
+  System instruction  → who Gemini is + professor profile + output format + source weighting
+  User turn          → course context + per-material-type labeled sections + reflection checklist
 
-Write in clear, student-friendly language. Use Markdown for headings, lists, and emphasis."""
+Modular design: edit MATERIAL_INSTRUCTIONS[type] or the block constants below to tune
+how Gemini treats any individual material type without touching the rest of the prompt.
+"""
 
 GEMINI_MODEL = "gemini-1.5-flash"
 
+# Per-source character cap before truncation (~3 k tokens each)
+_MAX_CHARS_PER_SOURCE = 12_000
+# Soft cap on total user-turn character length (~18 k tokens)
+_MAX_TOTAL_CHARS = 72_000
 
-def build_user_prompt(course: str, professor_name: str, user_specs: str | None, source_sections: list[tuple[str, str]]) -> str:
-    parts = []
-    if course or professor_name:
-        line = []
-        if course:
-            line.append(f"Course: {course}")
-        if professor_name:
-            line.append(f"Professor: {professor_name}")
-        parts.append(" ".join(line))
+# ---------------------------------------------------------------------------
+# Modular per-material-type instructions
+# Edit any entry independently to change how Gemini uses that source type.
+# ---------------------------------------------------------------------------
+MATERIAL_INSTRUCTIONS: dict[str, str] = {
+    "past_test": (
+        "These are PAST EXAMS / PAST TESTS — the highest-priority signal.\n"
+        "• Extract every topic, question type, and concept that was tested.\n"
+        "• Topics appearing across multiple tests are HIGH PRIORITY.\n"
+        "• Use question phrasing to understand how the professor frames concepts on exams.\n"
+        "• Every tested topic MUST appear in the final study guide."
+    ),
+    "handout": (
+        "These are PROFESSOR HANDOUTS — authoritative course content.\n"
+        "• Use the professor's exact terminology for all definitions.\n"
+        "• Include every concept, framework, and example the professor chose to present.\n"
+        "• Weight these heavily alongside past tests."
+    ),
+    "note": (
+        "These are STUDENT NOTES — supporting context.\n"
+        "• Use to elaborate on concepts from handouts.\n"
+        "• When notes conflict with handouts, defer to handout wording.\n"
+        "• Lower priority than handouts and past tests."
+    ),
+    "study_guide": (
+        "This is a PREVIOUS STUDY GUIDE — structural reference only.\n"
+        "• Do not copy it. Identify what it covers and what it misses.\n"
+        "• Cross-reference with past tests to find gaps.\n"
+        "• Lowest priority; the new guide should improve on it."
+    ),
+    "other": (
+        "SUPPLEMENTARY MATERIAL — use for additional context and breadth of coverage."
+    ),
+}
+
+_TYPE_HEADING: dict[str, str] = {
+    "past_test":   "PAST TESTS  ⟵ Highest priority — primary exam signal",
+    "handout":     "PROFESSOR HANDOUTS  ⟵ High priority — authoritative content",
+    "note":        "STUDENT NOTES  ⟵ Supporting context",
+    "study_guide": "PREVIOUS STUDY GUIDES  ⟵ Structural reference only",
+    "other":       "SUPPLEMENTARY MATERIALS",
+}
+
+# ---------------------------------------------------------------------------
+# System-instruction building blocks (edit these to tune global behavior)
+# ---------------------------------------------------------------------------
+_WEIGHTING_BLOCK = """\
+SOURCE WEIGHTING — when topics conflict or context space is limited, apply in this order:
+  1. Past tests        → determines what MUST be in the guide
+  2. Professor profile → shapes emphasis, terminology, and tone
+  3. Handouts          → authoritative definitions and frameworks
+  4. Student notes     → supporting elaboration
+  5. Previous study guides → structural reference only
+"""
+
+_OUTPUT_FORMAT_BLOCK = """\
+OUTPUT FORMAT — respond in Markdown using this exact structure:
+
+## Overview
+2–3 sentences covering what this guide focuses on and the highest-priority areas.
+
+## Topics
+For each major topic:
+
+### [Topic Name]
+**Priority:** HIGH | MEDIUM | LOW
+*(HIGH = appears on past tests or explicitly emphasized by the professor)*
+**Sources:** [which materials covered this]
+- Key concepts, definitions, and details to know
+
+## High-Priority Topics at a Glance
+Bulleted list of every HIGH priority topic (quick-reference checklist).
+
+## Practice Questions
+8–12 questions modeled on the past tests. Include a brief answer for each.
+Format each as:
+**Q:** question text
+**A:** answer text
+
+## Coverage Gaps
+Flag any topics from the materials that were NOT tested in past exams (and vice versa).
+"""
+
+_REFLECTION_BLOCK = """\
+BEFORE WRITING THE FINAL OUTPUT — silently run this checklist:
+1. Every topic from the past tests appears in the Topics section and is marked HIGH.
+2. Every HIGH-priority topic has at least one Practice Question.
+3. The professor's known emphasis (from their profile) is reflected in the priority labels.
+4. No topic is marked HIGH unless it appears in past tests or the professor profile.
+Fix any failures before producing the output.
+"""
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def build_system_instruction(professor_profile: dict | None) -> str:
+    """
+    Build the system instruction.
+    The professor profile belongs here (not in the user turn) so it acts as
+    a persistent lens over every decision Gemini makes.
+    """
+    base = (
+        "You are an expert, exam-focused study guide generator.\n"
+        "Your goal is to help students succeed on their specific professor's exams.\n\n"
+    )
+
+    if professor_profile:
+        name = professor_profile.get("name") or ""
+        specialties = professor_profile.get("specialties") or ""
+        description = professor_profile.get("description") or ""
+        prof_block = f"## Professor Profile: {name}\n"
+        if specialties:
+            prof_block += f"Specialties: {specialties}\n"
+        if description:
+            prof_block += f"Teaching style and emphasis: {description}\n"
+        prof_block += (
+            "\nUse this profile to:\n"
+            "• Mirror this professor's terminology and reasoning style.\n"
+            "• Elevate topics this professor is known to emphasize.\n"
+            "• Frame all explanations the way this professor would.\n\n"
+        )
+        base += prof_block
+
+    return base + _WEIGHTING_BLOCK + "\n" + _OUTPUT_FORMAT_BLOCK + "\n" + _REFLECTION_BLOCK
+
+
+def build_user_prompt(
+    course: str,
+    professor_name: str,
+    user_specs: str | None,
+    typed_sources: list[tuple[str, str, str]],  # (material_type, label, text)
+) -> str:
+    """
+    Build the user-turn prompt.
+    Sources are grouped by material type, each group prefixed with its
+    instructions so Gemini knows exactly how to use each one.
+    """
+    parts: list[str] = []
+
+    # Context header
+    header: list[str] = []
+    if course:
+        header.append(f"**Course:** {course}")
+    if professor_name:
+        header.append(f"**Professor:** {professor_name}")
+    if header:
+        parts.append("\n".join(header))
+
     if user_specs and user_specs.strip():
-        parts.append(f"User specifications:\n{user_specs.strip()}")
-    parts.append("\n---\nMaterials from uploaded files:\n")
-    for label, text in source_sections:
+        parts.append(f"\n**Student's special instructions:**\n{user_specs.strip()}")
+
+    # Group sources by material type
+    grouped: dict[str, list[tuple[str, str]]] = {}
+    for mtype, label, text in typed_sources:
         if text and text.strip():
-            parts.append(f"\n### From: {label}\n\n{text.strip()}\n")
+            grouped.setdefault(mtype, []).append((label, text))
+
+    if not grouped:
+        return "\n".join(parts) if parts else ""
+
+    type_order = ["past_test", "handout", "note", "study_guide", "other"]
+    total_chars = sum(len(p) for p in parts)
+
+    for mtype in type_order:
+        if mtype not in grouped:
+            continue
+        heading = _TYPE_HEADING.get(mtype, mtype.upper())
+        instruction = MATERIAL_INSTRUCTIONS.get(mtype, "")
+        parts.append(f"\n---\n## {heading}\n_{instruction}_")
+        for label, text in grouped[mtype]:
+            if total_chars >= _MAX_TOTAL_CHARS:
+                parts.append(f"\n### {label}\n*[Omitted — total context limit reached]*\n")
+                continue
+            truncated = _truncate_text(text, _MAX_CHARS_PER_SOURCE)
+            total_chars += len(truncated)
+            parts.append(f"\n### {label}\n\n{truncated}\n")
+
     return "\n".join(parts)
 
 
-def generate_study_guide(course: str, professor_name: str, user_specs: str | None, source_sections: list[tuple[str, str]], api_key: str) -> tuple[str, str]:
+def generate_study_guide(
+    course: str,
+    professor_name: str,
+    user_specs: str | None,
+    typed_sources: list[tuple[str, str, str]],  # (material_type, label, text)
+    professor_profile: dict | None,
+    api_key: str,
+) -> tuple[str, str]:
     """
-    Call Gemini (Google) to generate study guide. Returns (content, model_used).
-    source_sections: list of (file_label, extracted_text).
+    Call Gemini to generate a study guide.
+    Returns (markdown_content, model_used).
     """
     try:
         import google.generativeai as genai
@@ -41,20 +216,38 @@ def generate_study_guide(course: str, professor_name: str, user_specs: str | Non
         raise RuntimeError("google-generativeai package not installed")
     if not api_key:
         raise ValueError("GEMINI_API_KEY is not set")
-    genai.configure(api_key=api_key)
-    user_content = build_user_prompt(course, professor_name, user_specs, source_sections)
+
+    system_instruction = build_system_instruction(professor_profile)
+    user_content = build_user_prompt(course, professor_name, user_specs, typed_sources)
+
     if not user_content.strip():
         return (
-            "*No content could be extracted from the uploaded files. Please upload PDF or text files with readable content.*",
+            "*No content could be extracted from the uploaded files. "
+            "Please upload PDF or text files with readable content.*",
             "none",
         )
+
+    genai.configure(api_key=api_key)
     model = genai.GenerativeModel(
         GEMINI_MODEL,
-        system_instruction=SYSTEM_PROMPT,
-        generation_config={"max_output_tokens": 4096},
+        system_instruction=system_instruction,
+        generation_config={"max_output_tokens": 8192},
     )
     response = model.generate_content(user_content)
     if not response or not response.text:
         return ("*No response generated.*", GEMINI_MODEL)
-    content = response.text.strip()
-    return content, GEMINI_MODEL
+    return response.text.strip(), GEMINI_MODEL
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _truncate_text(text: str, max_chars: int) -> str:
+    """Truncate text to max_chars, breaking on a newline boundary where possible."""
+    if len(text) <= max_chars:
+        return text
+    cutoff = text.rfind("\n", 0, max_chars)
+    cutoff = cutoff if cutoff > max_chars // 2 else max_chars
+    omitted = len(text) - cutoff
+    return text[:cutoff] + f"\n\n*[Source truncated — {omitted:,} characters omitted]*"

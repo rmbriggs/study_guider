@@ -37,6 +37,7 @@ class GuideSource(Base):
     file_type = Column(String(64), nullable=False)
     file_path = Column(String(512), nullable=True)
     extracted_text = Column(Text, nullable=True)
+    material_type = Column(String(32), nullable=True)  # past_test | handout | note | study_guide | other
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     guide = relationship("StudyGuide", back_populates="sources")

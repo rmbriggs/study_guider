@@ -4,7 +4,7 @@ import { createGuide, getGuideOptions } from '../api/guides'
 import { useAuth } from '../context/AuthContext'
 import { verifyEmail } from '../api/auth'
 import { getApiErrorMessage } from '../utils/apiError'
-import { FileText, BookOpen, StickyNote } from 'lucide-react'
+import { FileText, BookOpen, StickyNote, ClipboardList } from 'lucide-react'
 import Button from '../components/Button'
 import Input from '../components/Input'
 import Select from '../components/Select'
@@ -31,6 +31,7 @@ export default function CreateGuide() {
   const handleNewCourseClose = () => {
     setCourseSelect('')
   }
+  const [pastTests, setPastTests] = useState([])
   const [handouts, setHandouts] = useState([])
   const [studyGuides, setStudyGuides] = useState([])
   const [notes, setNotes] = useState([])
@@ -52,7 +53,7 @@ export default function CreateGuide() {
     }
   }, [user?.email_verified])
 
-  const allFiles = [...handouts, ...studyGuides, ...notes]
+  const allFiles = [...pastTests, ...handouts, ...studyGuides, ...notes]
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -72,7 +73,10 @@ export default function CreateGuide() {
       formData.append('course', course)
       formData.append('professor_name', professorName)
       formData.append('user_specs', userSpecs)
-      allFiles.forEach((f) => formData.append('files', f))
+      pastTests.forEach((f) => formData.append('past_tests', f))
+      handouts.forEach((f) => formData.append('handouts', f))
+      studyGuides.forEach((f) => formData.append('study_guides', f))
+      notes.forEach((f) => formData.append('notes', f))
       const data = await createGuide(formData)
       navigate(`/guide/${data.id}`)
     } catch (err) {
@@ -202,6 +206,26 @@ export default function CreateGuide() {
             PDF or TXT. Max 10 files total, 10 MB each.
           </p>
           <div className="upload-tiles">
+            <div className="upload-tile">
+              <div className="upload-tile-icon ib-orange">
+                <ClipboardList size={22} />
+              </div>
+              <div className="upload-tile-title">Past tests</div>
+              <label className="upload-tile-trigger">
+                <input
+                  type="file"
+                  accept=".pdf,.txt"
+                  multiple
+                  onChange={(e) => setPastTests(Array.from(e.target.files || []))}
+                />
+                {pastTests.length > 0 ? `${pastTests.length} file(s)` : 'Choose files'}
+              </label>
+              {pastTests.length > 0 && (
+                <p className="upload-tile-files">
+                  {pastTests.map((f) => f.name).join(', ')}
+                </p>
+              )}
+            </div>
             <div className="upload-tile">
               <div className="upload-tile-icon ib-blue">
                 <FileText size={22} />
