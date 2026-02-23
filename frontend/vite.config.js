@@ -45,6 +45,7 @@ export default defineConfig({
   preview: {
     host: true,
     https: false,
+    fallback: true,
     allowedHosts: ['www.coursemind.app', 'coursemind.app'],
     proxy: {
       '/api': {
