@@ -885,7 +885,7 @@ export default function EditCourse() {
         })}
       </div>
 
-      <div style={{ maxWidth: 560 }}>
+      <div style={{ maxWidth: 1200, width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
           <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>Materials by test</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
