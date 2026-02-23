@@ -41,10 +41,16 @@ export default defineConfig({
     },
   },
   // Production preview server: plain HTTP, bind to all interfaces.
-  // PORT is passed explicitly via --port $PORT in the start script.
+  // On Railway, proxy /api to the backend (internal URL so browser stays on same origin).
   preview: {
     host: true,
     https: false,
     allowedHosts: ['www.coursemind.app', 'coursemind.app'],
+    proxy: {
+      '/api': {
+        target: process.env.RAILWAY_BACKEND_URL || 'http://unique-mindfulness.railway.internal',
+        changeOrigin: true,
+      },
+    },
   },
 })
