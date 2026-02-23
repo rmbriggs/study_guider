@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FilePlus, BookOpen, GraduationCap, Users, Sun, Moon, LogOut } from 'lucide-react'
+import { LayoutDashboard, FilePlus, BookOpen, GraduationCap, Users, Shield, Sun, Moon, LogOut } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 
@@ -69,6 +69,17 @@ export default function Sidebar() {
             </div>
             Manage Professors
           </NavLink>
+          {user?.is_admin && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
+            >
+              <div className="sidebar-icon ib-green">
+                <Shield size={18} />
+              </div>
+              Admin
+            </NavLink>
+          )}
         </div>
       </div>
       {user && (

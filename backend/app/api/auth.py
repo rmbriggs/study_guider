@@ -47,6 +47,7 @@ def _make_user_response(user: User) -> UserResponse:
         username=user.username,
         email=user.email,
         email_verified=getattr(user, "email_verified", False),
+        is_admin=getattr(user, "is_admin", False),
     )
 
 

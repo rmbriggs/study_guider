@@ -15,6 +15,7 @@ import ManageCourses from './pages/ManageCourses'
 import ManageProfessors from './pages/ManageProfessors'
 import EditCourse from './pages/EditCourse'
 import EditProfessor from './pages/EditProfessor'
+import Admin from './pages/Admin'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -39,6 +40,20 @@ function PublicOnlyRoute({ children }) {
     )
   }
   if (user) return <Navigate to="/" replace />
+  return children
+}
+
+function AdminRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading…</p>
+      </div>
+    )
+  }
+  if (!user) return <Navigate to="/login" replace />
+  if (!user.is_admin) return <Navigate to="/" replace />
   return children
 }
 
@@ -125,6 +140,14 @@ export default function App() {
           <ProtectedRoute>
             <AppLayout><EditProfessor /></AppLayout>
           </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <AdminRoute>
+            <AppLayout><Admin /></AppLayout>
+          </AdminRoute>
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />

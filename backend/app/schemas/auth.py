@@ -37,6 +37,7 @@ class UserResponse(BaseModel):
     username: str
     email: str
     email_verified: bool = False
+    is_admin: bool = False
 
     class Config:
         from_attributes = True

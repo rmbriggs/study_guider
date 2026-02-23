@@ -12,6 +12,8 @@ class Settings(BaseSettings):
 
     # Auth
     secret_key: str = "change-me-in-production-use-env"
+    # Comma-separated user IDs to grant admin (e.g. "1" or "1,2"). Applied on startup.
+    admin_user_ids: str = ""
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 1 week
     auth_cookie_name: str = "coursemind_session"
