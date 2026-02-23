@@ -72,9 +72,52 @@ export function getAttachmentFileUrl(courseId, attachmentId) {
   return `${base}/courses/${courseId}/attachments/${attachmentId}/file`
 }
 
+/** Returns the syllabus file URL for a course (requires auth) */
+export function getSyllabusFileUrl(courseId) {
+  const base = api.defaults.baseURL || ''
+  return `${base}/courses/${courseId}/syllabus/file`
+}
+
 /** Fetch attachment file with auth and open in new tab (for PDF etc.) */
 export async function openAttachmentFile(courseId, attachmentId) {
   const { data } = await api.get(getAttachmentFileUrl(courseId, attachmentId), { responseType: 'blob' })
   const url = URL.createObjectURL(data)
   window.open(url, '_blank', 'noopener')
+}
+
+/** Fetch attachment with auth and trigger download */
+export async function downloadAttachment(courseId, attachmentId, filename) {
+  const { data } = await api.get(getAttachmentFileUrl(courseId, attachmentId), { responseType: 'blob' })
+  const url = URL.createObjectURL(data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || 'download'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Fetch syllabus with auth and open in new tab */
+export async function openSyllabusFile(courseId) {
+  const { data } = await api.get(getSyllabusFileUrl(courseId), { responseType: 'blob' })
+  const url = URL.createObjectURL(data)
+  window.open(url, '_blank', 'noopener')
+}
+
+/** Fetch syllabus with auth and trigger download */
+export async function downloadSyllabus(courseId, filename) {
+  const { data } = await api.get(getSyllabusFileUrl(courseId), { responseType: 'blob' })
+  const url = URL.createObjectURL(data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || 'syllabus'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Add files to an existing course. formData should have handouts[], past_tests[], notes[] (FileList or File[]) */
+export async function addCourseFiles(courseId, formData) {
+  const { data } = await api.post(`/courses/${courseId}/files`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
 }

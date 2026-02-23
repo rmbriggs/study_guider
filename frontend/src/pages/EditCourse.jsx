@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, FileText, BookOpen, FileStack, Pencil, Plus, ExternalLink } from 'lucide-react'
+import { ArrowLeft, FileText, BookOpen, FileStack, Pencil, Plus, ExternalLink, Download, Upload } from 'lucide-react'
 import {
   getCourse,
   updateCourse,
@@ -11,6 +11,10 @@ import {
   deleteTest,
   updateAttachment,
   openAttachmentFile,
+  downloadAttachment,
+  openSyllabusFile,
+  downloadSyllabus,
+  addCourseFiles,
 } from '../api/courses'
 import { getApiErrorMessage } from '../utils/apiError'
 import Button from '../components/Button'
@@ -138,14 +142,26 @@ function SectionCard({
                   {att.file_name}
                 </span>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  style={{ padding: '4px 8px', fontSize: 13 }}
-                  onClick={() => openAttachmentFile(courseId, att.id)}
-                >
-                  <ExternalLink size={14} />
-                </button>
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ padding: '4px 8px', fontSize: 13 }}
+                    onClick={() => openAttachmentFile(courseId, att.id)}
+                    title="Open"
+                  >
+                    <ExternalLink size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ padding: '4px 8px', fontSize: 13 }}
+                    onClick={() => downloadAttachment(courseId, att.id, att.file_name)}
+                    title="Download"
+                  >
+                    <Download size={14} />
+                  </button>
+                </div>
                 <select
                   className="input"
                   style={{ width: 'auto', minWidth: 140, fontSize: 13 }}
@@ -181,10 +197,17 @@ export default function EditCourse() {
   const [loading, setLoading] = useState(false)
   const [fetchError, setFetchError] = useState('')
   const [fetching, setFetching] = useState(true)
+  const [syllabusFilePath, setSyllabusFilePath] = useState(null)
   const [materials, setMaterials] = useState({ tests: [], attachments: [] })
   const [materialsLoading, setMaterialsLoading] = useState(true)
   const [newSectionName, setNewSectionName] = useState('')
   const [addingSection, setAddingSection] = useState(false)
+  const [filesUploading, setFilesUploading] = useState(false)
+  const [filesError, setFilesError] = useState('')
+  const [addFilesOpen, setAddFilesOpen] = useState(false)
+  const handoutsInputRef = useRef(null)
+  const pastTestsInputRef = useRef(null)
+  const notesInputRef = useRef(null)
 
   useEffect(() => {
     getProfessors()
@@ -201,6 +224,7 @@ export default function EditCourse() {
         setNickname(c.nickname ?? '')
         setProfessorSelect(c.professor_name ?? '')
         setPersonalDescription(c.personal_description ?? '')
+        setSyllabusFilePath(c.syllabus_file_path ?? null)
       })
       .catch(() => setFetchError('Course not found'))
       .finally(() => setFetching(false))
@@ -274,8 +298,50 @@ export default function EditCourse() {
     } catch (_) {}
   }
 
+  const handleAddFiles = async (e) => {
+    e.preventDefault()
+    setFilesError('')
+    const formData = new FormData()
+    let count = 0
+    const h = handoutsInputRef.current?.files
+    if (h?.length) for (let i = 0; i < h.length; i++) { formData.append('handouts', h[i]); count++ }
+    const p = pastTestsInputRef.current?.files
+    if (p?.length) for (let i = 0; i < p.length; i++) { formData.append('past_tests', p[i]); count++ }
+    const n = notesInputRef.current?.files
+    if (n?.length) for (let i = 0; i < n.length; i++) { formData.append('notes', n[i]); count++ }
+    if (count === 0) {
+      setFilesError('Select at least one file to add.')
+      return
+    }
+    setFilesUploading(true)
+    try {
+      await addCourseFiles(courseId, formData)
+      if (handoutsInputRef.current) handoutsInputRef.current.value = ''
+      if (pastTestsInputRef.current) pastTestsInputRef.current.value = ''
+      if (notesInputRef.current) notesInputRef.current.value = ''
+      setAddFilesOpen(false)
+      loadMaterials()
+    } catch (err) {
+      setFilesError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to add files'))
+    } finally {
+      setFilesUploading(false)
+    }
+  }
+
   const uncategorizedAttachments = (materials.attachments || []).filter((a) => a.test_id == null)
   const courseId = Number(id)
+  const attachmentsByKind = {
+    syllabus: syllabusFilePath ? [{ id: 'syllabus', file_name: 'Syllabus', attachment_kind: 'syllabus' }] : [],
+    past_test: (materials.attachments || []).filter((a) => a.attachment_kind === 'past_test'),
+    handout: (materials.attachments || []).filter((a) => a.attachment_kind === 'handout'),
+    note: (materials.attachments || []).filter((a) => a.attachment_kind === 'note'),
+  }
+  const fileGroupConfig = [
+    { key: 'syllabus', label: 'Syllabus', icon: FileText, canAdd: false },
+    { key: 'past_test', label: 'Past tests', icon: BookOpen, canAdd: true },
+    { key: 'handout', label: 'Handouts', icon: FileText, canAdd: true },
+    { key: 'note', label: 'Notes', icon: FileStack, canAdd: true },
+  ]
 
   if (fetching) {
     return (
@@ -332,12 +398,6 @@ export default function EditCourse() {
               placeholder="Select a professor…"
             />
           </div>
-          <div style={{ marginBottom: 16 }}>
-            <span className="form-label">Syllabus</span>
-            <p className="form-note">
-              File uploads cannot be changed here. Current syllabus is stored on the server.
-            </p>
-          </div>
           <div style={{ marginBottom: 24 }}>
             <label className="form-label">Personal description (optional)</label>
             <textarea
@@ -356,6 +416,104 @@ export default function EditCourse() {
             </Button>
           </div>
         </form>
+      </div>
+
+      <div style={{ maxWidth: 560, marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>Files</h2>
+          <Button
+            variant="secondary"
+            className="btn-secondary"
+            onClick={() => { setAddFilesOpen((o) => !o); setFilesError('') }}
+          >
+            <Upload size={18} />
+            Add files
+          </Button>
+        </div>
+        {addFilesOpen && (
+          <div className="card card-static" style={{ marginBottom: 16 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: 'var(--text-primary)' }}>Upload new files</h3>
+            <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 16 }}>
+              PDF or TXT. Past tests will create a new section each. Syllabus cannot be changed here.
+            </p>
+            <form onSubmit={handleAddFiles}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>Past tests</label>
+                <input ref={pastTestsInputRef} type="file" accept=".pdf,.txt" multiple className="input" style={{ padding: 8 }} />
+                <label className="form-label" style={{ marginBottom: 0 }}>Handouts</label>
+                <input ref={handoutsInputRef} type="file" accept=".pdf,.txt" multiple className="input" style={{ padding: 8 }} />
+                <label className="form-label" style={{ marginBottom: 0 }}>Notes</label>
+                <input ref={notesInputRef} type="file" accept=".pdf,.txt" multiple className="input" style={{ padding: 8 }} />
+              </div>
+              {filesError && <div className="error-msg" style={{ marginBottom: 12 }}>{filesError}</div>}
+              <div style={{ display: 'flex', gap: 12 }}>
+                <Button type="submit" variant="accent" className="btn-accent" disabled={filesUploading}>
+                  {filesUploading ? 'Uploading…' : 'Upload'}
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => { setAddFilesOpen(false); setFilesError('') }}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
+        {fileGroupConfig.map(({ key, label, icon: Icon }) => {
+          const items = attachmentsByKind[key] || []
+          return (
+            <div key={key} className="card card-static" style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <span className="icon-badge ib-blue" style={{ width: 36, height: 36, marginBottom: 0 }}>
+                  <Icon size={18} />
+                </span>
+                <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>{label}</h3>
+              </div>
+              {items.length === 0 ? (
+                <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>
+                  {key === 'syllabus' ? 'No syllabus uploaded.' : `No ${label.toLowerCase()} yet.`}
+                </p>
+              ) : (
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {items.map((item) => (
+                    <li
+                      key={item.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '10px 0',
+                        borderBottom: '1px solid var(--bg-tertiary)',
+                      }}
+                    >
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 14 }} title={item.file_name}>
+                        {item.file_name}
+                      </span>
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ padding: '4px 8px' }}
+                          onClick={() => key === 'syllabus' ? openSyllabusFile(courseId) : openAttachmentFile(courseId, item.id)}
+                          title="Open"
+                        >
+                          <ExternalLink size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ padding: '4px 8px' }}
+                          onClick={() => key === 'syllabus' ? downloadSyllabus(courseId, item.file_name) : downloadAttachment(courseId, item.id, item.file_name)}
+                          title="Download"
+                        >
+                          <Download size={14} />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <div style={{ maxWidth: 560 }}>

@@ -251,6 +251,90 @@ def get_attachment_file(
     return FileResponse(path, filename=att.file_name, media_type="application/octet-stream")
 
 
+@router.get("/{course_id}/syllabus/file")
+def get_syllabus_file(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    course = _get_course_or_404(course_id, current_user.id, db)
+    if not course.syllabus_file_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No syllabus file")
+    path = Path(course.syllabus_file_path)
+    if not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Syllabus file not found")
+    filename = path.name
+    if "_" in filename:
+        filename = filename.split("_", 1)[-1]
+    return FileResponse(path, filename=filename, media_type="application/octet-stream")
+
+
+@router.post("/{course_id}/files")
+async def add_course_files(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    handouts: list[UploadFile] = File(default=[]),
+    past_tests: list[UploadFile] = File(default=[]),
+    notes: list[UploadFile] = File(default=[]),
+):
+    course = _get_course_or_404(course_id, current_user.id, db)
+    all_extra = [
+        (h, CourseAttachmentType.HANDOUT) for h in (handouts or []) if h and h.filename
+    ] + [
+        (p, CourseAttachmentType.PAST_TEST) for p in (past_tests or []) if p and p.filename
+    ] + [
+        (n, CourseAttachmentType.NOTE) for n in (notes or []) if n and n.filename
+    ]
+    if not all_extra:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No files provided. Add at least one file (handout, past test, or note).",
+        )
+    existing_count = db.query(CourseAttachment).filter(CourseAttachment.course_id == course_id).count()
+    if existing_count + len(all_extra) > MAX_COURSE_FILES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Maximum {MAX_COURSE_FILES} total files per course. You have {existing_count}, adding {len(all_extra)} would exceed the limit.",
+        )
+    course_upload_dir = _ensure_upload_dir(COURSE_FILES_SUBDIR)
+    max_order = db.query(CourseTest).filter(CourseTest.course_id == course_id).count()
+    sort_order = max_order
+    for upload_file, kind in all_extra:
+        ext = Path(upload_file.filename).suffix.lstrip(".").lower()
+        if ext not in ALLOWED:
+            continue
+        content = await upload_file.read()
+        if len(content) > MAX_SIZE:
+            continue
+        safe_name = f"{uuid.uuid4().hex}_{upload_file.filename}"[:200]
+        path = course_upload_dir / safe_name
+        path.write_bytes(content)
+        test_id = None
+        if kind == CourseAttachmentType.PAST_TEST:
+            section_name = (Path(upload_file.filename).stem or "Past test").strip()[:255]
+            course_test = CourseTest(
+                course_id=course.id,
+                name=section_name or "Past test",
+                sort_order=sort_order,
+            )
+            db.add(course_test)
+            db.flush()
+            test_id = course_test.id
+            sort_order += 1
+        att = CourseAttachment(
+            course_id=course.id,
+            test_id=test_id,
+            file_name=upload_file.filename,
+            file_type=ext,
+            file_path=str(path),
+            attachment_kind=kind,
+        )
+        db.add(att)
+    db.commit()
+    return {"ok": True, "added": len(all_extra)}
+
+
 @router.get("", response_model=list[CourseListItem])
 def list_my_courses(
     db: Session = Depends(get_db),
