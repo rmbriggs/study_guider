@@ -1,15 +1,23 @@
 """
 Direct admin script using the Railway public database URL.
 Usage:
-    python scripts/_db_admin.py list
-    python scripts/_db_admin.py grant-admin <user_id>
-    python scripts/_db_admin.py delete-all
-    python scripts/_db_admin.py reset-sequence
+    DATABASE_PUBLIC_URL="postgresql://..." python scripts/_db_admin.py list
+    DATABASE_PUBLIC_URL="postgresql://..." python scripts/_db_admin.py grant-admin <user_id>
+    DATABASE_PUBLIC_URL="postgresql://..." python scripts/_db_admin.py delete-all
+    DATABASE_PUBLIC_URL="postgresql://..." python scripts/_db_admin.py reset-sequence
+
+Set DATABASE_PUBLIC_URL to your Railway PostgreSQL public URL (from Railway dashboard).
+Never hardcode credentials in this file.
 """
 import sys
 import os
 
-PUBLIC_DB_URL = "postgresql://postgres:iCganKvxtfFdCrYYFYoAwEMLKYQOEeSa@shuttle.proxy.rlwy.net:26610/railway"
+PUBLIC_DB_URL = os.environ.get("DATABASE_PUBLIC_URL") or os.environ.get("DATABASE_URL")
+if not PUBLIC_DB_URL:
+    print("ERROR: Set DATABASE_PUBLIC_URL environment variable before running this script.")
+    print("  Example (bash):  DATABASE_PUBLIC_URL='postgresql://...' python scripts/_db_admin.py list")
+    print("  Example (Windows cmd):  set DATABASE_PUBLIC_URL=postgresql://... && python scripts/_db_admin.py list")
+    sys.exit(1)
 
 os.environ["DATABASE_URL"] = PUBLIC_DB_URL
 
