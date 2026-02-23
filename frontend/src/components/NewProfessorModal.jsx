@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { createProfessor } from '../api/courses'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -45,8 +46,12 @@ export default function NewProfessorModal({ open, onClose, onSuccess }) {
 
   if (!open) return null
 
-  return (
-    <div className="modal-backdrop" onClick={handleBackdropClick} style={{ zIndex: 210 }}>
+  const modal = (
+    <div
+      className="modal-backdrop"
+      onClick={handleBackdropClick}
+      style={{ zIndex: 10000 }}
+    >
       <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2 className="modal-title">New professor</h2>
@@ -94,4 +99,6 @@ export default function NewProfessorModal({ open, onClose, onSuccess }) {
       </div>
     </div>
   )
+
+  return createPortal(modal, document.body)
 }
