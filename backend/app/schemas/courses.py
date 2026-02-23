@@ -108,3 +108,4 @@ class CourseMaterialsResponse(BaseModel):
 class AttachmentUpdate(BaseModel):
     test_id: int | None = None
     test_ids: list[int] | None = None
+    file_name: str | None = None

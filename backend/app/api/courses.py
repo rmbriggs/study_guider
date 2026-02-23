@@ -242,6 +242,15 @@ def update_attachment(
     if not att:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
 
+    if body.file_name is not None:
+        name = (body.file_name or "").strip()
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File name cannot be empty",
+            )
+        att.file_name = name[:255]
+
     def set_attachment_test_ids(test_ids: list[int]):
         unique: list[int] = []
         seen: set[int] = set()

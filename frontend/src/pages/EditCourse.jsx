@@ -52,6 +52,7 @@ function AttachmentRow({
   moveOptions,
   onAssign,
   onRemoveFromBlock,
+  onRename,
   onDeleteAttachment,
   onReload,
 }) {
@@ -59,6 +60,9 @@ function AttachmentRow({
   const label = ATTACHMENT_KIND_LABEL[att.attachment_kind] || att.attachment_kind
   const [deleting, setDeleting] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [editNameValue, setEditNameValue] = useState(att.file_name)
+  const [renameLoading, setRenameLoading] = useState(false)
   const menuWrapRef = useRef(null)
   const testIds = getAttachmentTestIds(att)
   const alsoInNames = allowMultipleBlocks
@@ -127,13 +131,55 @@ function AttachmentRow({
         <Icon size={15} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.file_name}>
-          {att.file_name}
-        </div>
-        {allowMultipleBlocks && alsoInNames.length > 0 && (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            Also in: {alsoInNames.slice(0, 2).join(', ')}{alsoInNames.length > 2 ? ` +${alsoInNames.length - 2}` : ''}
+        {editingName ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              className="input"
+              value={editNameValue}
+              onChange={(e) => setEditNameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const v = (editNameValue || '').trim()
+                  if (v && v !== att.file_name) {
+                    setRenameLoading(true)
+                    onRename(att, v).then(() => { setEditingName(false); setRenameLoading(false) }).catch(() => setRenameLoading(false))
+                  } else setEditingName(false)
+                }
+                if (e.key === 'Escape') setEditingName(false)
+              }}
+              style={{ flex: 1, minWidth: 120, fontSize: 14 }}
+              autoFocus
+              disabled={renameLoading}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ padding: '2px 8px', fontSize: 12 }}
+              onClick={() => {
+                const v = (editNameValue || '').trim()
+                if (v && v !== att.file_name) {
+                  setRenameLoading(true)
+                  onRename(att, v).then(() => { setEditingName(false); setRenameLoading(false) }).catch(() => setRenameLoading(false))
+                } else setEditingName(false)
+              }}
+              disabled={renameLoading || !(editNameValue || '').trim() || (editNameValue || '').trim() === att.file_name}
+            >
+              {renameLoading ? '…' : 'Save'}
+            </button>
+            <button type="button" className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => { setEditingName(false); setEditNameValue(att.file_name) }}>Cancel</button>
           </div>
+        ) : (
+          <>
+            <div style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.file_name}>
+              {att.file_name}
+            </div>
+            {allowMultipleBlocks && alsoInNames.length > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Also in: {alsoInNames.slice(0, 2).join(', ')}{alsoInNames.length > 2 ? ` +${alsoInNames.length - 2}` : ''}
+              </div>
+            )}
+          </>
         )}
       </div>
       <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
@@ -188,6 +234,20 @@ function AttachmentRow({
             role="menu"
             style={{ right: 0, left: 'auto', minWidth: 200 }}
           >
+            {onRename && (
+              <button
+                type="button"
+                className="select-option"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setEditNameValue(att.file_name)
+                  setEditingName(true)
+                }}
+              >
+                Rename
+              </button>
+            )}
             <div style={{ padding: '6px 10px', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>
               Assign to
             </div>
@@ -236,6 +296,7 @@ function KindSection({
   moveOptions,
   onAssign,
   onRemoveFromBlock,
+  onRename,
   onDeleteAttachment,
   onReload,
 }) {
@@ -262,6 +323,7 @@ function KindSection({
               moveOptions={moveOptions}
               onAssign={onAssign}
               onRemoveFromBlock={onRemoveFromBlock}
+              onRename={onRename}
               onDeleteAttachment={onDeleteAttachment}
               onReload={onReload}
             />
@@ -319,6 +381,11 @@ function TestBlockCard({
   const handleRemoveFromBlock = async (att, removeTestId) => {
     const current = getAttachmentTestIds(att)
     await setAttachmentTestIds(att, current.filter((tid) => tid !== removeTestId))
+  }
+
+  const handleRenameAttachment = async (att, newName) => {
+    await updateAttachment(courseId, att.id, { file_name: newName })
+    onReload()
   }
 
   const handleSaveName = async () => {
@@ -399,6 +466,7 @@ function TestBlockCard({
         moveOptions={moveOptions}
         onAssign={handleAssign}
         onRemoveFromBlock={handleRemoveFromBlock}
+        onRename={handleRenameAttachment}
         onDeleteAttachment={onDeleteAttachment}
         onReload={onReload}
       />
@@ -413,6 +481,7 @@ function TestBlockCard({
         moveOptions={moveOptions}
         onAssign={handleAssign}
         onRemoveFromBlock={handleRemoveFromBlock}
+        onRename={handleRenameAttachment}
         onDeleteAttachment={onDeleteAttachment}
         onReload={onReload}
       />
@@ -427,6 +496,7 @@ function TestBlockCard({
         moveOptions={moveOptions}
         onAssign={handleAssign}
         onRemoveFromBlock={handleRemoveFromBlock}
+        onRename={handleRenameAttachment}
         onDeleteAttachment={onDeleteAttachment}
         onReload={onReload}
       />
@@ -459,6 +529,8 @@ export default function EditCourse() {
   const [addFilesNotes, setAddFilesNotes] = useState([])
   const [filesAddedMessage, setFilesAddedMessage] = useState('')
   const [deletingId, setDeletingId] = useState(null)
+  const [renamingFileId, setRenamingFileId] = useState(null)
+  const [renamingFileValue, setRenamingFileValue] = useState('')
   const [allowMultipleBlocks, setAllowMultipleBlocks] = useState(false)
   const handoutsInputRef = useRef(null)
   const pastTestsInputRef = useRef(null)
@@ -638,6 +710,20 @@ export default function EditCourse() {
   }
 
   const handleDeleteAttachment = (attachmentId) => deleteAttachment(courseId, attachmentId)
+
+  const handleRenameFileSave = async () => {
+    if (!renamingFileId || !(renamingFileValue || '').trim()) {
+      setRenamingFileId(null)
+      return
+    }
+    try {
+      await updateAttachment(courseId, renamingFileId, { file_name: renamingFileValue.trim() })
+      loadMaterials()
+      setRenamingFileId(null)
+    } catch (err) {
+      setFilesError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to rename file'))
+    }
+  }
 
   const uncategorizedAttachments = (materials.attachments || []).filter((a) => getAttachmentTestIds(a).length === 0)
   const courseId = Number(id)
@@ -852,10 +938,40 @@ export default function EditCourse() {
                         borderBottom: '1px solid var(--bg-tertiary)',
                       }}
                     >
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 14 }} title={item.file_name}>
-                        {item.file_name}
-                      </span>
+                      {key !== 'syllabus' && renamingFileId === item.id ? (
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="text"
+                            className="input"
+                            value={renamingFileValue}
+                            onChange={(e) => setRenamingFileValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleRenameFileSave()
+                              if (e.key === 'Escape') setRenamingFileId(null)
+                            }}
+                            style={{ flex: 1, minWidth: 120, fontSize: 14 }}
+                            autoFocus
+                          />
+                          <button type="button" className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 13 }} onClick={handleRenameFileSave}>Save</button>
+                          <button type="button" className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 13 }} onClick={() => { setRenamingFileId(null) }}>Cancel</button>
+                        </div>
+                      ) : (
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 14 }} title={item.file_name}>
+                          {item.file_name}
+                        </span>
+                      )}
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        {key !== 'syllabus' && renamingFileId !== item.id && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            style={{ padding: '4px 8px' }}
+                            onClick={() => { setRenamingFileId(item.id); setRenamingFileValue(item.file_name) }}
+                            title="Rename"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn btn-ghost"
