@@ -65,11 +65,12 @@ def _send_email(to_email: str, subject: str, text: str, html: str) -> None:
     msg.attach(MIMEText(html, "html"))
     try:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+            server.ehlo()
             if settings.smtp_user and settings.smtp_password:
                 server.starttls()
+                server.ehlo()
                 server.login(settings.smtp_user, settings.smtp_password)
             server.sendmail(settings.smtp_from_email, [to_email], msg.as_string())
         logger.info("Email sent to %s", to_email)
     except Exception as e:
         logger.exception("Failed to send email to %s: %s", to_email, e)
-        raise
