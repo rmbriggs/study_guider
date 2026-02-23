@@ -66,6 +66,14 @@ export async function updateAttachment(courseId, attachmentId, body) {
   return data
 }
 
+export async function deleteAttachment(courseId, attachmentId) {
+  await api.delete(`/courses/${courseId}/attachments/${attachmentId}`)
+}
+
+export async function deleteSyllabus(courseId) {
+  await api.delete(`/courses/${courseId}/syllabus`)
+}
+
 /** Path relative to API base for attachment file (used with api.get for auth) */
 function getAttachmentFilePath(courseId, attachmentId) {
   return `/courses/${courseId}/attachments/${attachmentId}/file`

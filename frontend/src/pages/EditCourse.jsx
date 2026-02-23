@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, FileText, BookOpen, FileStack, Pencil, Plus, Download, Upload } from 'lucide-react'
+import { ArrowLeft, FileText, BookOpen, FileStack, Pencil, Plus, Download, Upload, Trash2 } from 'lucide-react'
 import {
   getCourse,
   updateCourse,
@@ -13,6 +13,8 @@ import {
   downloadAttachment,
   downloadSyllabus,
   addCourseFiles,
+  deleteAttachment,
+  deleteSyllabus,
 } from '../api/courses'
 import { getApiErrorMessage } from '../utils/apiError'
 import Button from '../components/Button'
@@ -41,9 +43,11 @@ function SectionCard({
   onReload,
   onRename,
   onDelete,
+  onDeleteAttachment,
   isUncategorized,
 }) {
   const [moveLoading, setMoveLoading] = useState(null)
+  const [deletingAttId, setDeletingAttId] = useState(null)
   const [editingName, setEditingName] = useState(false)
   const [editNameValue, setEditNameValue] = useState(title)
 
@@ -140,15 +144,38 @@ function SectionCard({
                   {att.file_name}
                 </span>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  style={{ padding: '4px 8px', fontSize: 13 }}
-                  onClick={() => downloadAttachment(courseId, att.id, att.file_name)}
-                  title="Download"
-                >
-                  <Download size={14} />
-                </button>
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ padding: '4px 8px', fontSize: 13 }}
+                    onClick={() => downloadAttachment(courseId, att.id, att.file_name)}
+                    title="Download"
+                  >
+                    <Download size={14} />
+                  </button>
+                  {onDeleteAttachment && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ padding: '4px 8px', fontSize: 13, color: 'var(--color-error)' }}
+                      onClick={async () => {
+                        if (!window.confirm(`Delete "${att.file_name}"? This cannot be undone.`)) return
+                        setDeletingAttId(att.id)
+                        try {
+                          await onDeleteAttachment(att.id)
+                          onReload()
+                        } finally {
+                          setDeletingAttId(null)
+                        }
+                      }}
+                      disabled={deletingAttId === att.id}
+                      title="Delete"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
                 <select
                   className="input"
                   style={{ width: 'auto', minWidth: 140, fontSize: 13 }}
@@ -195,6 +222,8 @@ export default function EditCourse() {
   const [addFilesHandouts, setAddFilesHandouts] = useState([])
   const [addFilesPastTests, setAddFilesPastTests] = useState([])
   const [addFilesNotes, setAddFilesNotes] = useState([])
+  const [filesAddedMessage, setFilesAddedMessage] = useState('')
+  const [deletingId, setDeletingId] = useState(null)
   const handoutsInputRef = useRef(null)
   const pastTestsInputRef = useRef(null)
   const notesInputRef = useRef(null)
@@ -301,6 +330,8 @@ export default function EditCourse() {
       return
     }
     setFilesUploading(true)
+    setFilesError('')
+    setFilesAddedMessage('')
     try {
       await addCourseFiles(courseId, formData)
       setAddFilesHandouts([])
@@ -309,14 +340,36 @@ export default function EditCourse() {
       if (handoutsInputRef.current) handoutsInputRef.current.value = ''
       if (pastTestsInputRef.current) pastTestsInputRef.current.value = ''
       if (notesInputRef.current) notesInputRef.current.value = ''
-      setAddFilesOpen(false)
+      setFilesAddedMessage(`Added ${count} file(s). You can add more below or close.`)
       loadMaterials()
+      getCourse(courseId).then((c) => setSyllabusFilePath(c.syllabus_file_path ?? null))
     } catch (err) {
       setFilesError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to add files'))
     } finally {
       setFilesUploading(false)
     }
   }
+
+  const handleDeleteFile = async (key, item) => {
+    const name = item.file_name || 'this file'
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return
+    setDeletingId(key === 'syllabus' ? 'syllabus' : item.id)
+    try {
+      if (key === 'syllabus') {
+        await deleteSyllabus(courseId)
+        setSyllabusFilePath(null)
+      } else {
+        await deleteAttachment(courseId, item.id)
+      }
+      loadMaterials()
+    } catch (err) {
+      setFilesError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to delete file'))
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const handleDeleteAttachment = (attachmentId) => deleteAttachment(courseId, attachmentId)
 
   const uncategorizedAttachments = (materials.attachments || []).filter((a) => a.test_id == null)
   const courseId = Number(id)
@@ -414,18 +467,24 @@ export default function EditCourse() {
           <Button
             variant="secondary"
             className="btn-secondary"
-            onClick={() => { setAddFilesOpen((o) => !o); setFilesError('') }}
+            onClick={() => { setAddFilesOpen((o) => !o); setFilesError(''); setFilesAddedMessage('') }}
           >
             <Upload size={18} />
             Add files
           </Button>
         </div>
+        {filesError && !addFilesOpen && (
+          <div className="error-msg" style={{ marginBottom: 16 }}>{filesError}</div>
+        )}
         {addFilesOpen && (
           <div className="card card-static" style={{ marginBottom: 16 }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: 'var(--text-primary)' }}>Upload new files</h3>
             <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 16 }}>
-              PDF or TXT. Past tests will create a new section each. Syllabus cannot be changed here.
+              PDF or TXT. Select multiple files per category (e.g. several handouts at once), then click Upload. Past tests create a new section each. Syllabus cannot be changed here.
             </p>
+            {filesAddedMessage && (
+              <p style={{ fontSize: 14, color: 'var(--green-bold)', marginBottom: 12 }}>{filesAddedMessage}</p>
+            )}
             <form onSubmit={handleAddFiles}>
               <div className="upload-tiles" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
                 <div className="upload-tile" style={{ minHeight: 'auto' }}>
@@ -528,15 +587,27 @@ export default function EditCourse() {
                       <span style={{ flex: 1, minWidth: 0, fontSize: 14 }} title={item.file_name}>
                         {item.file_name}
                       </span>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        style={{ padding: '4px 8px' }}
-                        onClick={() => key === 'syllabus' ? downloadSyllabus(courseId, item.file_name) : downloadAttachment(courseId, item.id, item.file_name)}
-                        title="Download"
-                      >
-                        <Download size={14} />
-                      </button>
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ padding: '4px 8px' }}
+                          onClick={() => key === 'syllabus' ? downloadSyllabus(courseId, item.file_name) : downloadAttachment(courseId, item.id, item.file_name)}
+                          title="Download"
+                        >
+                          <Download size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ padding: '4px 8px', color: 'var(--color-error)' }}
+                          onClick={() => handleDeleteFile(key, item)}
+                          disabled={deletingId === (key === 'syllabus' ? 'syllabus' : item.id)}
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -578,6 +649,7 @@ export default function EditCourse() {
               courseId={courseId}
               onReload={loadMaterials}
               onRename={() => {}}
+              onDeleteAttachment={handleDeleteAttachment}
               isUncategorized
             />
             {(materials.tests || []).map((test) => (
@@ -591,6 +663,7 @@ export default function EditCourse() {
                 onReload={loadMaterials}
                 onRename={handleRenameSection}
                 onDelete={handleDeleteSection}
+                onDeleteAttachment={handleDeleteAttachment}
                 isUncategorized={false}
               />
             ))}

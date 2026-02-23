@@ -231,6 +231,43 @@ def update_attachment(
     return att
 
 
+@router.delete("/{course_id}/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_attachment(
+    course_id: int,
+    attachment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_course_or_404(course_id, current_user.id, db)
+    att = db.query(CourseAttachment).filter(
+        CourseAttachment.id == attachment_id,
+        CourseAttachment.course_id == course_id,
+    ).first()
+    if not att:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+    path = Path(att.file_path)
+    if path.is_file():
+        path.unlink()
+    db.delete(att)
+    db.commit()
+
+
+@router.delete("/{course_id}/syllabus", status_code=status.HTTP_204_NO_CONTENT)
+def delete_syllabus(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    course = _get_course_or_404(course_id, current_user.id, db)
+    if not course.syllabus_file_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No syllabus file")
+    path = Path(course.syllabus_file_path)
+    if path.is_file():
+        path.unlink()
+    course.syllabus_file_path = None
+    db.commit()
+
+
 @router.get("/{course_id}/attachments/{attachment_id}/file")
 def get_attachment_file(
     course_id: int,
