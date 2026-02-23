@@ -63,7 +63,7 @@ export default function CreateGuide() {
       return
     }
     if (allFiles.length === 0) {
-      setError('Please upload at least one file (PDF or TXT).')
+      setError('Please upload at least one file (PDF, TXT, MD, DOC, DOCX, RTF, ODT, or HTML).')
       return
     }
     setLoading(true)
@@ -203,7 +203,7 @@ export default function CreateGuide() {
         </div>
         <div className="card card-static" style={{ marginBottom: 24 }}>
           <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
-            PDF or TXT. Max 10 files total, 10 MB each.
+            PDF, TXT, MD, DOC, DOCX, RTF, ODT, or HTML. Max 10 files total, 10 MB each.
           </p>
           <div className="upload-tiles">
             <div className="upload-tile">
@@ -214,7 +214,7 @@ export default function CreateGuide() {
               <label className="upload-tile-trigger">
                 <input
                   type="file"
-                  accept=".pdf,.txt"
+                  accept=".pdf,.txt,.md,.doc,.docx,.rtf,.odt,.html,.htm"
                   multiple
                   onChange={(e) => setPastTests(Array.from(e.target.files || []))}
                 />
@@ -234,7 +234,7 @@ export default function CreateGuide() {
               <label className="upload-tile-trigger">
                 <input
                   type="file"
-                  accept=".pdf,.txt"
+                  accept=".pdf,.txt,.md,.doc,.docx,.rtf,.odt,.html,.htm"
                   multiple
                   onChange={(e) => setHandouts(Array.from(e.target.files || []))}
                 />
@@ -254,7 +254,7 @@ export default function CreateGuide() {
               <label className="upload-tile-trigger">
                 <input
                   type="file"
-                  accept=".pdf,.txt"
+                  accept=".pdf,.txt,.md,.doc,.docx,.rtf,.odt,.html,.htm"
                   multiple
                   onChange={(e) => setStudyGuides(Array.from(e.target.files || []))}
                 />
@@ -274,7 +274,7 @@ export default function CreateGuide() {
               <label className="upload-tile-trigger">
                 <input
                   type="file"
-                  accept=".pdf,.txt"
+                  accept=".pdf,.txt,.md,.doc,.docx,.rtf,.odt,.html,.htm"
                   multiple
                   onChange={(e) => setNotes(Array.from(e.target.files || []))}
                 />

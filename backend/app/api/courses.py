@@ -520,7 +520,7 @@ async def _save_upload(f: UploadFile, upload_dir: Path) -> str:
     if ext not in ALLOWED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File type .{ext} not allowed. Allowed: PDF, TXT",
+            detail=f"File type .{ext} not allowed. Allowed: {', '.join(sorted(ALLOWED)).upper()}",
         )
     content = await f.read()
     if len(content) > MAX_SIZE:

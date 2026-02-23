@@ -147,7 +147,7 @@ export default function NewCourseModal({ open, onClose, onSuccess }) {
               <label className="upload-tile-trigger">
                 <input
                   type="file"
-                  accept=".pdf,.txt"
+                  accept=".pdf,.txt,.md,.doc,.docx,.rtf,.odt,.html,.htm"
                   onChange={(e) => setSyllabusFile(e.target.files?.[0] || null)}
                 />
                 {syllabusFile ? syllabusFile.name : 'Choose file'}
@@ -159,7 +159,7 @@ export default function NewCourseModal({ open, onClose, onSuccess }) {
           </div>
           <div style={{ marginBottom: 16 }}>
             <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>
-              PDF or TXT. Optional materials for this course.
+              PDF, TXT, MD, DOC, DOCX, RTF, ODT, or HTML. Optional materials for this course.
             </p>
             <div className="upload-tiles" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
               <div className="upload-tile" style={{ minHeight: 'auto' }}>
@@ -170,7 +170,7 @@ export default function NewCourseModal({ open, onClose, onSuccess }) {
                 <label className="upload-tile-trigger">
                   <input
                     type="file"
-                    accept=".pdf,.txt"
+                    accept=".pdf,.txt,.md,.doc,.docx,.rtf,.odt,.html,.htm"
                     multiple
                     onChange={(e) => setHandouts(Array.from(e.target.files || []))}
                   />
@@ -188,7 +188,7 @@ export default function NewCourseModal({ open, onClose, onSuccess }) {
                 <label className="upload-tile-trigger">
                   <input
                     type="file"
-                    accept=".pdf,.txt"
+                    accept=".pdf,.txt,.md,.doc,.docx,.rtf,.odt,.html,.htm"
                     multiple
                     onChange={(e) => setPastTests(Array.from(e.target.files || []))}
                   />
@@ -206,7 +206,7 @@ export default function NewCourseModal({ open, onClose, onSuccess }) {
                 <label className="upload-tile-trigger">
                   <input
                     type="file"
-                    accept=".pdf,.txt"
+                    accept=".pdf,.txt,.md,.doc,.docx,.rtf,.odt,.html,.htm"
                     multiple
                     onChange={(e) => setNotes(Array.from(e.target.files || []))}
                   />

@@ -748,7 +748,7 @@ export default function EditCourse() {
           <div className="card card-static" style={{ marginBottom: 16 }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: 'var(--text-primary)' }}>Upload new files</h3>
             <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 16 }}>
-              PDF or TXT. Select multiple files per category (e.g. several handouts at once), then click Upload. Past tests create a new section each. Syllabus cannot be changed here.
+              PDF, TXT, MD, DOC, DOCX, RTF, ODT, or HTML. Select multiple files per category (e.g. several handouts at once), then click Upload. Past tests create a new section each. Syllabus cannot be changed here.
             </p>
             {filesAddedMessage && (
               <p style={{ fontSize: 14, color: 'var(--green-bold)', marginBottom: 12 }}>{filesAddedMessage}</p>
@@ -764,7 +764,7 @@ export default function EditCourse() {
                     <input
                       ref={pastTestsInputRef}
                       type="file"
-                      accept=".pdf,.txt"
+                      accept=".pdf,.txt,.md,.doc,.docx,.rtf,.odt,.html,.htm"
                       multiple
                       onChange={(e) => setAddFilesPastTests(Array.from(e.target.files || []))}
                     />
@@ -783,7 +783,7 @@ export default function EditCourse() {
                     <input
                       ref={handoutsInputRef}
                       type="file"
-                      accept=".pdf,.txt"
+                      accept=".pdf,.txt,.md,.doc,.docx,.rtf,.odt,.html,.htm"
                       multiple
                       onChange={(e) => setAddFilesHandouts(Array.from(e.target.files || []))}
                     />
@@ -802,7 +802,7 @@ export default function EditCourse() {
                     <input
                       ref={notesInputRef}
                       type="file"
-                      accept=".pdf,.txt"
+                      accept=".pdf,.txt,.md,.doc,.docx,.rtf,.odt,.html,.htm"
                       multiple
                       onChange={(e) => setAddFilesNotes(Array.from(e.target.files || []))}
                     />

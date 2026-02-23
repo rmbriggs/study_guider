@@ -223,7 +223,7 @@ def generate_study_guide(
     if not user_content.strip():
         return (
             "*No content could be extracted from the uploaded files. "
-            "Please upload PDF or text files with readable content.*",
+            "Please upload PDF, TXT, MD, DOC, DOCX, RTF, ODT, or HTML files with readable content.*",
             "none",
         )
 
