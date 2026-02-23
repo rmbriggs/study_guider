@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { getStoredToken, setAuthToken, logout as apiLogout } from '../api/auth'
+import { logout as apiLogout } from '../api/auth'
 import { api } from '../api/client'
 
 const AuthContext = createContext(null)
@@ -9,25 +9,17 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = getStoredToken()
-    if (token) {
-      setAuthToken(token)
-      api.get('/auth/me').then(({ data }) => {
-        setUser(data) // { id, username, email }
-      }).catch(() => {
-        apiLogout()
-        setUser(null)
-      }).finally(() => setLoading(false))
-    } else {
-      setLoading(false)
-    }
+    // Cookie-based auth: /auth/me with credentials determines if we're logged in
+    api.get('/auth/me')
+      .then(({ data }) => setUser(data))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false))
   }, [])
 
   const login = (userData) => setUser(userData?.user ?? userData)
   const updateUser = (userData) => setUser(userData)
   const logout = () => {
-    apiLogout()
-    setUser(null)
+    apiLogout().finally(() => setUser(null))
   }
 
   return (

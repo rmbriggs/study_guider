@@ -2,6 +2,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.config import get_settings
@@ -44,6 +45,42 @@ def _make_user_response(user: User) -> UserResponse:
     )
 
 
+def _cookie_max_age_seconds() -> int:
+    return settings.access_token_expire_minutes * 60
+
+
+def _set_auth_cookie_response(data: dict, access_token: str, persistent: bool = True) -> JSONResponse:
+    """Build JSON response and set HttpOnly, Secure, SameSite auth cookie.
+    If persistent is False, cookie is a session cookie (cleared when browser closes).
+    """
+    response = JSONResponse(content=data)
+    kwargs = {
+        "key": settings.auth_cookie_name,
+        "value": access_token,
+        "httponly": True,
+        "secure": settings.secure_cookies,
+        "samesite": "lax",
+        "path": "/",
+    }
+    if persistent:
+        kwargs["max_age"] = _cookie_max_age_seconds()
+    response.set_cookie(**kwargs)
+    return response
+
+
+def _clear_auth_cookie_response(data: dict | None = None) -> JSONResponse:
+    """Build response that clears the auth cookie."""
+    response = JSONResponse(content=data or {"message": "Logged out"})
+    response.delete_cookie(
+        key=settings.auth_cookie_name,
+        path="/",
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite="lax",
+    )
+    return response
+
+
 def _username_taken(db: Session, username: str, exclude_user_id: int | None = None) -> bool:
     """Check if username is taken (case-insensitive). Optionally exclude a user (for updates)."""
     q = db.query(User).filter(func.lower(User.username) == username.lower())
@@ -65,7 +102,7 @@ def _create_verification_for_user(db: Session, user: User) -> EmailVerification:
     return ev
 
 
-@router.post("/register", response_model=Token)
+@router.post("/register")
 def register(data: UserCreate, db: Session = Depends(get_db)):
     if _username_taken(db, data.username):
         raise HTTPException(
@@ -91,13 +128,15 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
     verification_link = f"{settings.frontend_base_url.rstrip('/')}/verify-email?token={ev.token}"
     send_verification_email(user.email, verification_link, ev.code)
     access_token = create_access_token(user.id)
-    return Token(
+    user_res = _make_user_response(user)
+    return _set_auth_cookie_response(
+        data=Token(access_token=access_token, user=user_res).model_dump(),
         access_token=access_token,
-        user=_make_user_response(user),
+        persistent=data.stay_signed_in,
     )
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login")
 def login(data: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.password_hash):
@@ -106,10 +145,18 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
             detail="Invalid email or password",
         )
     access_token = create_access_token(user.id)
-    return Token(
+    user_res = _make_user_response(user)
+    return _set_auth_cookie_response(
+        data=Token(access_token=access_token, user=user_res).model_dump(),
         access_token=access_token,
-        user=_make_user_response(user),
+        persistent=data.stay_signed_in,
     )
+
+
+@router.post("/logout")
+def logout():
+    """Clear the auth cookie so the user is logged out."""
+    return _clear_auth_cookie_response()
 
 
 @router.get("/me", response_model=UserResponse)

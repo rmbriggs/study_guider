@@ -9,6 +9,7 @@ import Input from '../components/Input'
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [staySignedIn, setStaySignedIn] = useState(true)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
@@ -25,7 +26,7 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      const data = await apiLogin(email, password)
+      const data = await apiLogin(email, password, staySignedIn)
       login(data.user)
       navigate('/')
     } catch (err) {
@@ -63,8 +64,17 @@ export default function Login() {
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-            style={{ marginBottom: 24 }}
+            style={{ marginBottom: 16 }}
           />
+          <label style={{ display: 'flex', alignItems: 'center', marginBottom: 24, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={staySignedIn}
+              onChange={(e) => setStaySignedIn(e.target.checked)}
+              style={{ marginRight: 8 }}
+            />
+            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Stay signed in</span>
+          </label>
           {successMessage && <div style={{ marginBottom: 16, color: 'var(--color-success)', fontSize: 14 }}>{successMessage}</div>}
           {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
           <Button type="submit" disabled={loading} style={{ width: '100%' }}>

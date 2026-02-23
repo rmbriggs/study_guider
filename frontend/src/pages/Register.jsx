@@ -16,6 +16,7 @@ const initialFormData = Object.fromEntries(SIGNUP_FIELDS.map((f) => [f.name, '']
 
 export default function Register() {
   const [formData, setFormData] = useState(initialFormData)
+  const [staySignedIn, setStaySignedIn] = useState(true)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
@@ -30,7 +31,7 @@ export default function Register() {
     setError('')
     setLoading(true)
     try {
-      const data = await apiRegister(formData.email, formData.password, formData.username)
+      const data = await apiRegister(formData.email, formData.password, formData.username, staySignedIn)
       login(data.user)
       navigate('/verify-email')
     } catch (err) {
@@ -60,9 +61,18 @@ export default function Register() {
               onChange={(e) => updateField(field.name, e.target.value)}
               required={field.required}
               autoComplete={field.autoComplete}
-              style={{ marginBottom: index === SIGNUP_FIELDS.length - 1 ? 24 : 16 }}
+              style={{ marginBottom: 16 }}
             />
           ))}
+          <label style={{ display: 'flex', alignItems: 'center', marginBottom: 24, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={staySignedIn}
+              onChange={(e) => setStaySignedIn(e.target.checked)}
+              style={{ marginRight: 8 }}
+            />
+            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Stay signed in</span>
+          </label>
           {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
           <Button type="submit" disabled={loading} style={{ width: '100%' }}>
             {loading ? 'Creating account…' : 'Sign up'}

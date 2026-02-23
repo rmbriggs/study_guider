@@ -18,6 +18,7 @@ class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     password: str = Field(..., min_length=1, max_length=PASSWORD_MAX_LENGTH)
+    stay_signed_in: bool = True
 
     @field_validator("username")
     @classmethod
@@ -28,6 +29,7 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=1, max_length=PASSWORD_MAX_LENGTH)
+    stay_signed_in: bool = True
 
 
 class UserResponse(BaseModel):

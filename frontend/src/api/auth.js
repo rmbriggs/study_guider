@@ -1,21 +1,16 @@
 import { api, setAuthToken } from './client'
 
 export { setAuthToken }
-const STORAGE_KEY = 'coursemind_token'
 
-export async function login(email, password) {
-  const { data } = await api.post('/auth/login', { email, password })
-  const token = data.access_token
-  localStorage.setItem(STORAGE_KEY, token)
-  setAuthToken(token)
+// Auth uses HttpOnly cookies; we do not store the token in localStorage.
+
+export async function login(email, password, staySignedIn = true) {
+  const { data } = await api.post('/auth/login', { email, password, stay_signed_in: staySignedIn })
   return data
 }
 
-export async function register(email, password, username) {
-  const { data } = await api.post('/auth/register', { email, password, username })
-  const token = data.access_token
-  localStorage.setItem(STORAGE_KEY, token)
-  setAuthToken(token)
+export async function register(email, password, username, staySignedIn = true) {
+  const { data } = await api.post('/auth/register', { email, password, username, stay_signed_in: staySignedIn })
   return data
 }
 
@@ -25,13 +20,17 @@ export async function updateUsername(username) {
   return data
 }
 
-export function logout() {
-  localStorage.removeItem(STORAGE_KEY)
-  setAuthToken(null)
+export async function logout() {
+  try {
+    await api.post('/auth/logout')
+  } finally {
+    setAuthToken(null)
+  }
 }
 
+/** Not used when auth is cookie-based; kept for compatibility. */
 export function getStoredToken() {
-  return localStorage.getItem(STORAGE_KEY)
+  return null
 }
 
 /** Verify email by 6-digit code or link token. body: { code: '123456' } or { token: '...' } */

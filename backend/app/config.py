@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production-use-env"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 1 week
+    auth_cookie_name: str = "coursemind_session"
+    # Secure cookie only over HTTPS. Set SECURE_COOKIES=false in .env for local dev (HTTP).
+    secure_cookies: bool = True
 
     # Database
     database_url: str = "sqlite:///./study_guider.db"
