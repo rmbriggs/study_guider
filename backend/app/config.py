@@ -27,12 +27,9 @@ class Settings(BaseSettings):
     max_files_per_request: int = 10
     allowed_extensions: set[str] = {"pdf", "txt"}
 
-    # Email (SMTP) for verification and password reset
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
-    smtp_from_email: str = ""
+    # Email (Resend) for verification and password reset
+    resend_api_key: str = ""
+    email_from: str = ""
     frontend_base_url: str = "https://localhost:5173"
 
     class Config:
