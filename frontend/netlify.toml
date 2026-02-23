@@ -1,0 +1,10 @@
+# Netlify: SPA so /reset-password/:token and other client routes work
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+# Serve index.html for all routes (password reset link, verify-email, etc.)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
