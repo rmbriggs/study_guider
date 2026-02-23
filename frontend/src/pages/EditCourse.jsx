@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, FileText, BookOpen, FileStack, Pencil, Plus, ExternalLink, Download, Upload } from 'lucide-react'
+import { ArrowLeft, FileText, BookOpen, FileStack, Pencil, Plus, Download, Upload } from 'lucide-react'
 import {
   getCourse,
   updateCourse,
@@ -10,9 +10,7 @@ import {
   updateTest,
   deleteTest,
   updateAttachment,
-  openAttachmentFile,
   downloadAttachment,
-  openSyllabusFile,
   downloadSyllabus,
   addCourseFiles,
 } from '../api/courses'
@@ -142,26 +140,15 @@ function SectionCard({
                   {att.file_name}
                 </span>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    style={{ padding: '4px 8px', fontSize: 13 }}
-                    onClick={() => openAttachmentFile(courseId, att.id)}
-                    title="Open"
-                  >
-                    <ExternalLink size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    style={{ padding: '4px 8px', fontSize: 13 }}
-                    onClick={() => downloadAttachment(courseId, att.id, att.file_name)}
-                    title="Download"
-                  >
-                    <Download size={14} />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ padding: '4px 8px', fontSize: 13 }}
+                  onClick={() => downloadAttachment(courseId, att.id, att.file_name)}
+                  title="Download"
+                >
+                  <Download size={14} />
+                </button>
                 <select
                   className="input"
                   style={{ width: 'auto', minWidth: 140, fontSize: 13 }}
@@ -205,6 +192,9 @@ export default function EditCourse() {
   const [filesUploading, setFilesUploading] = useState(false)
   const [filesError, setFilesError] = useState('')
   const [addFilesOpen, setAddFilesOpen] = useState(false)
+  const [addFilesHandouts, setAddFilesHandouts] = useState([])
+  const [addFilesPastTests, setAddFilesPastTests] = useState([])
+  const [addFilesNotes, setAddFilesNotes] = useState([])
   const handoutsInputRef = useRef(null)
   const pastTestsInputRef = useRef(null)
   const notesInputRef = useRef(null)
@@ -302,13 +292,10 @@ export default function EditCourse() {
     e.preventDefault()
     setFilesError('')
     const formData = new FormData()
-    let count = 0
-    const h = handoutsInputRef.current?.files
-    if (h?.length) for (let i = 0; i < h.length; i++) { formData.append('handouts', h[i]); count++ }
-    const p = pastTestsInputRef.current?.files
-    if (p?.length) for (let i = 0; i < p.length; i++) { formData.append('past_tests', p[i]); count++ }
-    const n = notesInputRef.current?.files
-    if (n?.length) for (let i = 0; i < n.length; i++) { formData.append('notes', n[i]); count++ }
+    addFilesHandouts.forEach((f) => formData.append('handouts', f))
+    addFilesPastTests.forEach((f) => formData.append('past_tests', f))
+    addFilesNotes.forEach((f) => formData.append('notes', f))
+    const count = addFilesHandouts.length + addFilesPastTests.length + addFilesNotes.length
     if (count === 0) {
       setFilesError('Select at least one file to add.')
       return
@@ -316,6 +303,9 @@ export default function EditCourse() {
     setFilesUploading(true)
     try {
       await addCourseFiles(courseId, formData)
+      setAddFilesHandouts([])
+      setAddFilesPastTests([])
+      setAddFilesNotes([])
       if (handoutsInputRef.current) handoutsInputRef.current.value = ''
       if (pastTestsInputRef.current) pastTestsInputRef.current.value = ''
       if (notesInputRef.current) notesInputRef.current.value = ''
@@ -437,20 +427,71 @@ export default function EditCourse() {
               PDF or TXT. Past tests will create a new section each. Syllabus cannot be changed here.
             </p>
             <form onSubmit={handleAddFiles}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
-                <label className="form-label" style={{ marginBottom: 0 }}>Past tests</label>
-                <input ref={pastTestsInputRef} type="file" accept=".pdf,.txt" multiple className="input" style={{ padding: 8 }} />
-                <label className="form-label" style={{ marginBottom: 0 }}>Handouts</label>
-                <input ref={handoutsInputRef} type="file" accept=".pdf,.txt" multiple className="input" style={{ padding: 8 }} />
-                <label className="form-label" style={{ marginBottom: 0 }}>Notes</label>
-                <input ref={notesInputRef} type="file" accept=".pdf,.txt" multiple className="input" style={{ padding: 8 }} />
+              <div className="upload-tiles" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
+                <div className="upload-tile" style={{ minHeight: 'auto' }}>
+                  <div className="upload-tile-icon ib-purple">
+                    <BookOpen size={22} />
+                  </div>
+                  <div className="upload-tile-title">Past tests</div>
+                  <label className="upload-tile-trigger">
+                    <input
+                      ref={pastTestsInputRef}
+                      type="file"
+                      accept=".pdf,.txt"
+                      multiple
+                      onChange={(e) => setAddFilesPastTests(Array.from(e.target.files || []))}
+                    />
+                    {addFilesPastTests.length > 0 ? `${addFilesPastTests.length} file(s)` : 'Choose files'}
+                  </label>
+                  {addFilesPastTests.length > 0 && (
+                    <p className="upload-tile-files">{addFilesPastTests.map((f) => f.name).join(', ')}</p>
+                  )}
+                </div>
+                <div className="upload-tile" style={{ minHeight: 'auto' }}>
+                  <div className="upload-tile-icon ib-blue">
+                    <FileText size={22} />
+                  </div>
+                  <div className="upload-tile-title">Handouts</div>
+                  <label className="upload-tile-trigger">
+                    <input
+                      ref={handoutsInputRef}
+                      type="file"
+                      accept=".pdf,.txt"
+                      multiple
+                      onChange={(e) => setAddFilesHandouts(Array.from(e.target.files || []))}
+                    />
+                    {addFilesHandouts.length > 0 ? `${addFilesHandouts.length} file(s)` : 'Choose files'}
+                  </label>
+                  {addFilesHandouts.length > 0 && (
+                    <p className="upload-tile-files">{addFilesHandouts.map((f) => f.name).join(', ')}</p>
+                  )}
+                </div>
+                <div className="upload-tile" style={{ minHeight: 'auto' }}>
+                  <div className="upload-tile-icon ib-teal">
+                    <FileStack size={22} />
+                  </div>
+                  <div className="upload-tile-title">Notes</div>
+                  <label className="upload-tile-trigger">
+                    <input
+                      ref={notesInputRef}
+                      type="file"
+                      accept=".pdf,.txt"
+                      multiple
+                      onChange={(e) => setAddFilesNotes(Array.from(e.target.files || []))}
+                    />
+                    {addFilesNotes.length > 0 ? `${addFilesNotes.length} file(s)` : 'Choose files'}
+                  </label>
+                  {addFilesNotes.length > 0 && (
+                    <p className="upload-tile-files">{addFilesNotes.map((f) => f.name).join(', ')}</p>
+                  )}
+                </div>
               </div>
               {filesError && <div className="error-msg" style={{ marginBottom: 12 }}>{filesError}</div>}
               <div style={{ display: 'flex', gap: 12 }}>
                 <Button type="submit" variant="accent" className="btn-accent" disabled={filesUploading}>
                   {filesUploading ? 'Uploading…' : 'Upload'}
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => { setAddFilesOpen(false); setFilesError('') }}>
+                <Button type="button" variant="ghost" onClick={() => { setAddFilesOpen(false); setFilesError(''); setAddFilesHandouts([]); setAddFilesPastTests([]); setAddFilesNotes([]) }}>
                   Cancel
                 </Button>
               </div>
@@ -487,26 +528,15 @@ export default function EditCourse() {
                       <span style={{ flex: 1, minWidth: 0, fontSize: 14 }} title={item.file_name}>
                         {item.file_name}
                       </span>
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          style={{ padding: '4px 8px' }}
-                          onClick={() => key === 'syllabus' ? openSyllabusFile(courseId) : openAttachmentFile(courseId, item.id)}
-                          title="Open"
-                        >
-                          <ExternalLink size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          style={{ padding: '4px 8px' }}
-                          onClick={() => key === 'syllabus' ? downloadSyllabus(courseId, item.file_name) : downloadAttachment(courseId, item.id, item.file_name)}
-                          title="Download"
-                        >
-                          <Download size={14} />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ padding: '4px 8px' }}
+                        onClick={() => key === 'syllabus' ? downloadSyllabus(courseId, item.file_name) : downloadAttachment(courseId, item.id, item.file_name)}
+                        title="Download"
+                      >
+                        <Download size={14} />
+                      </button>
                     </li>
                   ))}
                 </ul>

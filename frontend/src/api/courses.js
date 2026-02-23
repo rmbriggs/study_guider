@@ -66,52 +66,42 @@ export async function updateAttachment(courseId, attachmentId, body) {
   return data
 }
 
-/** Returns the attachment file URL for same-origin fetch with auth (use in window.open after blob fetch or trigger download) */
-export function getAttachmentFileUrl(courseId, attachmentId) {
-  const base = api.defaults.baseURL || ''
-  return `${base}/courses/${courseId}/attachments/${attachmentId}/file`
+/** Path relative to API base for attachment file (used with api.get for auth) */
+function getAttachmentFilePath(courseId, attachmentId) {
+  return `/courses/${courseId}/attachments/${attachmentId}/file`
 }
 
-/** Returns the syllabus file URL for a course (requires auth) */
-export function getSyllabusFileUrl(courseId) {
-  const base = api.defaults.baseURL || ''
-  return `${base}/courses/${courseId}/syllabus/file`
+/** Path relative to API base for syllabus file */
+function getSyllabusFilePath(courseId) {
+  return `/courses/${courseId}/syllabus/file`
 }
 
-/** Fetch attachment file with auth and open in new tab (for PDF etc.) */
-export async function openAttachmentFile(courseId, attachmentId) {
-  const { data } = await api.get(getAttachmentFileUrl(courseId, attachmentId), { responseType: 'blob' })
-  const url = URL.createObjectURL(data)
-  window.open(url, '_blank', 'noopener')
-}
-
-/** Fetch attachment with auth and trigger download */
+/** Fetch attachment with auth and trigger download. Uses link in DOM for reliability. */
 export async function downloadAttachment(courseId, attachmentId, filename) {
-  const { data } = await api.get(getAttachmentFileUrl(courseId, attachmentId), { responseType: 'blob' })
+  const { data } = await api.get(getAttachmentFilePath(courseId, attachmentId), { responseType: 'blob' })
   const url = URL.createObjectURL(data)
   const a = document.createElement('a')
   a.href = url
   a.download = filename || 'download'
+  a.style.display = 'none'
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
-}
-
-/** Fetch syllabus with auth and open in new tab */
-export async function openSyllabusFile(courseId) {
-  const { data } = await api.get(getSyllabusFileUrl(courseId), { responseType: 'blob' })
-  const url = URL.createObjectURL(data)
-  window.open(url, '_blank', 'noopener')
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 500)
 }
 
 /** Fetch syllabus with auth and trigger download */
 export async function downloadSyllabus(courseId, filename) {
-  const { data } = await api.get(getSyllabusFileUrl(courseId), { responseType: 'blob' })
+  const { data } = await api.get(getSyllabusFilePath(courseId), { responseType: 'blob' })
   const url = URL.createObjectURL(data)
   const a = document.createElement('a')
   a.href = url
   a.download = filename || 'syllabus'
+  a.style.display = 'none'
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 500)
 }
 
 /** Add files to an existing course. formData should have handouts[], past_tests[], notes[] (FileList or File[]) */
