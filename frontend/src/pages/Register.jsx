@@ -10,6 +10,7 @@ const SIGNUP_FIELDS = [
   { name: 'username', label: 'Username', type: 'text', placeholder: 'jane_doe', autoComplete: 'username', required: true },
   { name: 'email', label: 'Email', type: 'email', placeholder: 'you@example.com', autoComplete: 'email', required: true },
   { name: 'password', label: 'Password', type: 'password', placeholder: '••••••••', autoComplete: 'new-password', required: true },
+  { name: 'confirmPassword', label: 'Confirm password', type: 'password', placeholder: '••••••••', autoComplete: 'new-password', required: true },
 ]
 
 const initialFormData = Object.fromEntries(SIGNUP_FIELDS.map((f) => [f.name, '']))
@@ -29,6 +30,10 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
     setLoading(true)
     try {
       const data = await apiRegister(formData.email, formData.password, formData.username, staySignedIn)
