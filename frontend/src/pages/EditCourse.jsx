@@ -174,7 +174,7 @@ function AttachmentRow({
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.file_name}>
+            <div style={{ fontSize: 14, wordBreak: 'break-word', overflowWrap: 'break-word' }} title={att.file_name}>
               {att.file_name}
             </div>
             {allowMultipleBlocks && alsoInNames.length > 0 && (
@@ -357,6 +357,11 @@ function KindSection({
   )
 }
 
+function TestBlockSlot({ testId, children }) {
+  const { setNodeRef } = useDroppable({ id: `test-block-slot-${testId}` })
+  return <div ref={setNodeRef}>{children}</div>
+}
+
 function TestBlockCard({
   title,
   testId,
@@ -374,6 +379,17 @@ function TestBlockCard({
   const [editNameValue, setEditNameValue] = useState(title)
   const droppableId = testId == null ? 'uncat' : `test-${testId}`
   const { setNodeRef, isOver } = useDroppable({ id: droppableId })
+  const draggableId = testId != null ? `test-block-${testId}` : null
+  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
+    id: draggableId,
+    data: { testId },
+    disabled: !!isUncategorized,
+  })
+  const dragStyle = draggableId ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.7 : 1 } : {}
+  const mergeRef = (node) => {
+    setNodeRef(node)
+    if (setDragRef) setDragRef(node)
+  }
 
   const sectionNameById = Object.fromEntries((allSections || []).filter((s) => s?.id != null).map((s) => [s.id, s.name]))
 
@@ -435,14 +451,34 @@ function TestBlockCard({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={mergeRef}
       className="card card-static"
       style={{
         outline: isOver ? '2px solid var(--blue-bold)' : 'none',
         outlineOffset: 2,
+        ...dragStyle,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+        {!isUncategorized && draggableId && (
+          <span
+            {...attributes}
+            {...listeners}
+            style={{
+              width: 20,
+              height: 20,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-muted)',
+              cursor: 'grab',
+              flexShrink: 0,
+            }}
+            title="Drag to reorder section"
+          >
+            <GripVertical size={16} />
+          </span>
+        )}
         {isUncategorized ? (
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h3>
         ) : editingName ? (
@@ -646,15 +682,39 @@ export default function EditCourse() {
 
   const handleDragEnd = async ({ active, over }) => {
     if (!over) return
+    const activeId = String(active.id)
+    const overId = String(over.id)
+
+    if (activeId.startsWith('test-block-') && active.data?.current?.testId != null) {
+      const draggedTestId = active.data.current.testId
+      if (!overId.startsWith('test-block-slot-')) return
+      const overTestId = Number(overId.slice('test-block-slot-'.length))
+      if (Number.isNaN(overTestId)) return
+      const tests = materials.tests || []
+      const fromIndex = tests.findIndex((t) => t.id === draggedTestId)
+      const toIndex = tests.findIndex((t) => t.id === overTestId)
+      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return
+      const reordered = [...tests]
+      const [removed] = reordered.splice(fromIndex, 1)
+      reordered.splice(toIndex, 0, removed)
+      try {
+        for (let i = 0; i < reordered.length; i++) {
+          if (reordered[i].sort_order !== i) {
+            await updateTest(Number(id), reordered[i].id, { sort_order: i })
+          }
+        }
+        loadMaterials()
+      } catch (_) {}
+      return
+    }
+
     const { attachment, fromTestId } = active.data?.current || {}
     if (!attachment) return
 
-    const overId = over.id
     let targetTestId = null
     if (overId !== 'uncat') {
-      const s = String(overId)
-      if (s.startsWith('test-')) {
-        const n = Number(s.slice('test-'.length))
+      if (overId.startsWith('test-') && !overId.startsWith('test-block-')) {
+        const n = Number(overId.slice('test-'.length))
         if (!Number.isNaN(n)) targetTestId = n
       }
     }
@@ -1111,19 +1171,20 @@ export default function EditCourse() {
           <DndContext onDragEnd={handleDragEnd}>
             <div className="test-block-grid" style={{ marginBottom: 16 }}>
               {(materials.tests || []).map((test) => (
-                <TestBlockCard
-                  key={test.id}
-                  title={test.name}
-                  testId={test.id}
-                  attachments={(materials.attachments || []).filter((a) => getAttachmentTestIds(a).includes(test.id))}
-                  allSections={[{ id: null, name: 'Uncategorized' }, ...(materials.tests || [])]}
-                  courseId={courseId}
-                  onReload={loadMaterials}
-                  onRename={handleRenameSection}
-                  onDelete={handleDeleteSection}
-                  onDeleteAttachment={handleDeleteAttachment}
-                  isUncategorized={false}
-                />
+                <TestBlockSlot key={test.id} testId={test.id}>
+                  <TestBlockCard
+                    title={test.name}
+                    testId={test.id}
+                    attachments={(materials.attachments || []).filter((a) => getAttachmentTestIds(a).includes(test.id))}
+                    allSections={[{ id: null, name: 'Uncategorized' }, ...(materials.tests || [])]}
+                    courseId={courseId}
+                    onReload={loadMaterials}
+                    onRename={handleRenameSection}
+                    onDelete={handleDeleteSection}
+                    onDeleteAttachment={handleDeleteAttachment}
+                    isUncategorized={false}
+                  />
+                </TestBlockSlot>
               ))}
             </div>
 
