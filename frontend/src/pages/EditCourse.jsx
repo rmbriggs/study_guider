@@ -134,7 +134,7 @@ function AttachmentRow({
       >
         <Icon size={15} />
       </span>
-      <div style={{ flex: 1, minWidth: 80 }}>
+      <div style={{ flex: 1, minWidth: 80, overflow: 'hidden' }}>
         {editingName ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <input
@@ -175,7 +175,7 @@ function AttachmentRow({
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.file_name}>
+            <div style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }} title={att.file_name}>
               {att.file_name}
             </div>
             {allowMultipleBlocks && alsoInNames.length > 0 && (
@@ -358,11 +358,6 @@ function KindSection({
   )
 }
 
-function TestBlockSlot({ testId, children }) {
-  const { setNodeRef } = useDroppable({ id: `test-block-slot-${testId}` })
-  return <div ref={setNodeRef}>{children}</div>
-}
-
 function TestBlockCard({
   title,
   testId,
@@ -384,17 +379,6 @@ function TestBlockCard({
   const [editNameValue, setEditNameValue] = useState(title)
   const droppableId = testId == null ? 'uncat' : `test-${testId}`
   const { setNodeRef, isOver } = useDroppable({ id: droppableId })
-  const draggableId = testId != null ? `test-block-${testId}` : null
-  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
-    id: draggableId,
-    data: { testId },
-    disabled: !!isUncategorized,
-  })
-  const dragStyle = draggableId ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.7 : 1 } : {}
-  const mergeRef = (node) => {
-    setNodeRef(node)
-    if (setDragRef) setDragRef(node)
-  }
 
   const sectionNameById = Object.fromEntries((allSections || []).filter((s) => s?.id != null).map((s) => [s.id, s.name]))
 
@@ -456,34 +440,23 @@ function TestBlockCard({
 
   return (
     <div
-      ref={mergeRef}
+      ref={setNodeRef}
       className="card card-static"
       style={{
         outline: isOver ? '2px solid var(--blue-bold)' : 'none',
         outlineOffset: 2,
-        ...dragStyle,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-        {!isUncategorized && draggableId && (
-          <span
-            {...attributes}
-            {...listeners}
-            style={{
-              width: 20,
-              height: 20,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-muted)',
-              cursor: 'grab',
-              flexShrink: 0,
-            }}
-            title="Drag to reorder section"
-          >
-            <GripVertical size={16} />
-          </span>
-        )}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          marginBottom: 6,
+          ...(isUncategorized ? {} : { padding: '10px 12px', margin: '-10px -12px 6px -12px', backgroundColor: 'var(--bg-tertiary)', borderRadius: 8 }),
+        }}
+      >
         {isUncategorized ? (
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h3>
         ) : editingName ? (
@@ -711,43 +684,16 @@ export default function EditCourse() {
 
   const handleDragEnd = async ({ active, over }) => {
     if (!over) return
-    const activeId = String(active.id)
     const overId = String(over.id)
-
-    if (activeId.startsWith('test-block-') && active.data?.current?.testId != null) {
-      const draggedTestId = active.data.current.testId
-      if (!overId.startsWith('test-block-slot-')) return
-      const overTestId = Number(overId.slice('test-block-slot-'.length))
-      if (Number.isNaN(overTestId)) return
-      const tests = materials.tests || []
-      const fromIndex = tests.findIndex((t) => t.id === draggedTestId)
-      const toIndex = tests.findIndex((t) => t.id === overTestId)
-      if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return
-      const reordered = [...tests]
-      const [removed] = reordered.splice(fromIndex, 1)
-      reordered.splice(toIndex, 0, removed)
-      try {
-        for (let i = 0; i < reordered.length; i++) {
-          if (reordered[i].sort_order !== i) {
-            await updateTest(Number(id), reordered[i].id, { sort_order: i })
-          }
-        }
-        loadMaterials()
-      } catch (_) {}
-      return
-    }
 
     const { attachment, fromTestId } = active.data?.current || {}
     if (!attachment) return
 
     let targetTestId = null
-    if (overId !== 'uncat') {
-      if (overId.startsWith('test-') && !overId.startsWith('test-block-')) {
-        const n = Number(overId.slice('test-'.length))
-        if (!Number.isNaN(n)) targetTestId = n
-      }
+    if (overId !== 'uncat' && overId.startsWith('test-')) {
+      const n = Number(overId.slice('test-'.length))
+      if (!Number.isNaN(n)) targetTestId = n
     }
-
     if ((fromTestId ?? null) === (targetTestId ?? null)) return
 
     const current = getAttachmentTestIds(attachment)
@@ -1220,24 +1166,23 @@ export default function EditCourse() {
                 <div className="error-msg" style={{ marginBottom: 12 }}>{analyzeError}</div>
               )}
               {(materials.tests || []).map((test) => (
-                <TestBlockSlot key={test.id} testId={test.id}>
-                  <TestBlockCard
-                    title={test.name}
-                    testId={test.id}
-                    attachments={(materials.attachments || []).filter((a) => getAttachmentTestIds(a).includes(test.id))}
-                    allSections={[{ id: null, name: 'Uncategorized' }, ...(materials.tests || [])]}
-                    courseId={courseId}
-                    onReload={loadMaterials}
-                    onRename={handleRenameSection}
-                    onDelete={handleDeleteSection}
-                    onDeleteAttachment={handleDeleteAttachment}
-                    isUncategorized={false}
-                    isAnalyzed={!!test.is_analyzed}
-                    analysisSummary={test.analysis_summary ?? null}
-                    isAnalyzing={analyzingTestIds.has(test.id)}
-                    onAnalyze={handleAnalyze}
-                  />
-                </TestBlockSlot>
+                <TestBlockCard
+                  key={test.id}
+                  title={test.name}
+                  testId={test.id}
+                  attachments={(materials.attachments || []).filter((a) => getAttachmentTestIds(a).includes(test.id))}
+                  allSections={[{ id: null, name: 'Uncategorized' }, ...(materials.tests || [])]}
+                  courseId={courseId}
+                  onReload={loadMaterials}
+                  onRename={handleRenameSection}
+                  onDelete={handleDeleteSection}
+                  onDeleteAttachment={handleDeleteAttachment}
+                  isUncategorized={false}
+                  isAnalyzed={!!test.is_analyzed}
+                  analysisSummary={test.analysis_summary ?? null}
+                  isAnalyzing={analyzingTestIds.has(test.id)}
+                  onAnalyze={handleAnalyze}
+                />
               ))}
             </div>
 
