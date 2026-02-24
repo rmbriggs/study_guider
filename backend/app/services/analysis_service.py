@@ -31,6 +31,41 @@ def _repair_json_strings(s: str) -> str:
     return '"'.join(parts)
 
 
+def _remove_trailing_commas(s: str) -> str:
+    """Remove trailing commas before } or ] so JSON can parse (Gemini often adds them)."""
+    result = []
+    i = 0
+    in_string = False
+    escape = False
+    while i < len(s):
+        c = s[i]
+        if escape:
+            result.append(c)
+            escape = False
+            i += 1
+            continue
+        if c == "\\" and in_string:
+            escape = True
+            result.append(c)
+            i += 1
+            continue
+        if c == '"' and not escape:
+            in_string = not in_string
+            result.append(c)
+            i += 1
+            continue
+        if not in_string and c == ",":
+            j = i + 1
+            while j < len(s) and s[j] in " \t\n\r":
+                j += 1
+            if j < len(s) and s[j] in "}]":
+                i += 1  # skip trailing comma
+                continue
+        result.append(c)
+        i += 1
+    return "".join(result)
+
+
 def _parse_gemini_json(raw: str) -> dict:
     """
     Parse JSON from Gemini, repairing common issues: markdown fences,
@@ -50,8 +85,15 @@ def _parse_gemini_json(raw: str) -> dict:
     except json.JSONDecodeError:
         pass
 
+    # Try removing trailing commas before } or ] (Gemini often adds them)
+    s_no_trailing = _remove_trailing_commas(s)
+    try:
+        return json.loads(s_no_trailing)
+    except json.JSONDecodeError:
+        pass
+
     # Try repairing unescaped newlines inside strings (Gemini often outputs these)
-    s_repaired = _repair_json_strings(s)
+    s_repaired = _repair_json_strings(s_no_trailing)
     last_error = None
     try:
         return json.loads(s_repaired)

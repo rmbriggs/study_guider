@@ -1079,6 +1079,23 @@ select.input { cursor: pointer; }
 }
 .landing-hero-actions a { text-decoration: none; }
 .landing-btn-lg { padding: 12px 24px !important; font-size: 16px !important; }
+.landing-problem {
+  text-align: center;
+  padding: 40px 24px 48px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.landing-problem h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.landing-problem p {
+  font-size: 16px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
 .landing-features {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1161,6 +1178,8 @@ select.input { cursor: pointer; }
 [data-theme="dark"] .landing-page {
   background: linear-gradient(165deg, #1a1a2e 0%, #1e2a3a 40%, #1a2e2a 70%, #2a1a2e 100%);
 }
+[data-theme="dark"] .landing-problem h2 { color: var(--text-on-dark); }
+[data-theme="dark"] .landing-problem p { color: var(--text-on-dark-muted); }
 [data-theme="dark"] .landing-feature,
 [data-theme="dark"] .landing-cta {
   background: var(--surface-dark-secondary);

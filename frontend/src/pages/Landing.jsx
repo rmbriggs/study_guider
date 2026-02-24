@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { BookOpen, Sparkles, GraduationCap } from 'lucide-react'
+import { BookOpen, BarChart3, HelpCircle, FolderOpen } from 'lucide-react'
 import Button from '../components/Button'
 
 export default function Landing() {
@@ -21,51 +21,68 @@ export default function Landing() {
       <main className="landing-main">
         <section className="landing-hero">
           <h1 className="landing-hero-title">
-            Study smarter with AI-generated guides
+            AI-powered study guides tailored to your professor
           </h1>
           <p className="landing-hero-subtitle">
-            Add your courses and materials. CourseMind turns them into clear, personalized study guides so you can focus on understanding, not organizing.
+            CourseMind turns your course materials—past exams, handouts, and notes—into study guides that match how your professor actually tests.
           </p>
           <div className="landing-hero-actions">
             <Link to="/register">
-              <Button variant="primary" className="landing-btn-lg">Create free account</Button>
+              <Button variant="primary" className="landing-btn-lg">Get started free</Button>
             </Link>
             <Link to="/login">
-              <Button variant="ghost" className="landing-btn-lg">I already have an account</Button>
+              <Button variant="ghost" className="landing-btn-lg">Log in</Button>
             </Link>
           </div>
         </section>
 
+        <section className="landing-problem">
+          <h2>The problem</h2>
+          <p>
+            Students spend hours making study guides that are too broad, cover the wrong material, or use the wrong framing for their specific professor. A student in Biology 101 needs a very different guide than a student in Organic Chemistry—even for the same topic—because professors test differently. Generic AI tools don&apos;t know what <em>this professor</em> tests.
+          </p>
+        </section>
+
         <section className="landing-features">
           <div className="landing-feature">
-            <div className="landing-feature-icon ib-blue">
+            <div className="landing-feature-icon ib-purple">
               <BookOpen size={24} />
             </div>
-            <h3>One place for your courses</h3>
-            <p>Add courses, attach syllabi and materials, and keep everything in one place.</p>
+            <h3>Personalized study guides</h3>
+            <p>From your materials—past exams, handouts, notes. Guides prioritize exactly what has appeared on this professor&apos;s past exams and use their terminology.</p>
           </div>
           <div className="landing-feature">
-            <div className="landing-feature-icon ib-purple">
-              <Sparkles size={24} />
+            <div className="landing-feature-icon ib-blue">
+              <BarChart3 size={24} />
             </div>
-            <h3>AI study guides</h3>
-            <p>Generate clear, structured study guides from your materials in one click.</p>
+            <h3>Professor learning</h3>
+            <p>Use &quot;Analyze block&quot; to correlate past exams with handouts. The app learns topic frequency, question formats, and style—so every new guide gets smarter.</p>
           </div>
           <div className="landing-feature">
             <div className="landing-feature-icon ib-green">
-              <GraduationCap size={24} />
+              <HelpCircle size={24} />
             </div>
-            <h3>Built for students</h3>
-            <p>Designed around how you actually study—guides, quizzes, and progress in one app.</p>
+            <h3>Professor quiz</h3>
+            <p>Answer 5 short questions per professor (exam style, emphasis, weak areas). Your answers are passed into the AI so guides match what you already know.</p>
+          </div>
+          <div className="landing-feature">
+            <div className="landing-feature-icon ib-teal">
+              <FolderOpen size={24} />
+            </div>
+            <h3>Organized by course</h3>
+            <p>Courses, professors, and test blocks. Drag-and-drop to reorder. Upload PDF, DOCX, and more—everything in one place.</p>
           </div>
         </section>
 
         <section className="landing-cta">
           <h2>Ready to study smarter?</h2>
-          <p>Join CourseMind and turn your course materials into guides that actually help.</p>
+          <p>Join CourseMind and get study guides that focus on what your professor actually tests.</p>
           <Link to="/register">
-            <Button variant="primary" className="landing-btn-lg">Get started for free</Button>
+            <Button variant="primary" className="landing-btn-lg">Sign up free</Button>
           </Link>
+          <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-secondary)' }}>
+            Already have an account? <Link to="/login" style={{ color: 'var(--blue-bold)', fontWeight: 500 }}>Log in</Link>
+          </p>
         </section>
       </main>
 

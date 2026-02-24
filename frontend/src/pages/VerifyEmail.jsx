@@ -26,7 +26,7 @@ export default function VerifyEmail() {
       .then((data) => {
         if (data.user) login(data.user)
         const hasSession = getStoredToken()
-        navigate(hasSession ? '/' : '/login', { replace: true, state: hasSession ? undefined : { message: 'Email verified. You can log in now.' } })
+        navigate(hasSession ? '/dashboard' : '/login', { replace: true, state: hasSession ? undefined : { message: 'Email verified. You can log in now.' } })
       })
       .catch((err) => {
         setError(getApiErrorMessage(err, 'Verification failed'))
@@ -43,7 +43,7 @@ export default function VerifyEmail() {
     try {
       const data = await verifyEmail({ code: code.trim() })
       if (data.user) login(data.user)
-      navigate('/', { replace: true })
+      navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(getApiErrorMessage(err, 'Invalid or expired code'))
     } finally {
