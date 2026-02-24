@@ -15,6 +15,49 @@ The app is live at https://www.coursemind.app
 
 
 ================================================================================
+  HOW THE WHOLE PROJECT WORKS (end-to-end flow)
+================================================================================
+
+USER JOURNEY
+------------
+1. Sign up → verify email (link or 6-digit code) → log in.
+2. Create professors (name, specialties, teaching style). Optionally fill out
+   the study-guide quiz (5 AI-generated questions) so future guides are
+   tailored to what the student knows about this professor.
+3. Create courses (name, nickname, link to professor, optional syllabus).
+4. For each course, add "test blocks": upload past exams, handouts, and notes,
+   organized by exam period. Use drag-and-drop to reorder blocks and files.
+5. On test blocks that have both a past exam and handouts, click "Analyze
+   block" to run correlation analysis. Results feed into the professor's
+   analysis profile (topic frequency, question formats, etc.).
+6. Create study guide: pick course (by nickname), add title/instructions,
+   optionally attach extra files. The app pulls materials from the course's
+   test blocks, runs analysis on any unanalyzed blocks, builds a professor
+   profile (description + analysis_profile + quiz Q&A), and calls Gemini to
+   generate a prioritized study guide. The guide is saved and viewable on the
+   dashboard.
+
+DATA FLOW
+---------
+  - Auth: JWT in HttpOnly cookie; backend validates on every protected request.
+  - Courses/Professors/Guides: all scoped to the logged-in user (user_id).
+  - Study guide generation: course nickname → Course → Professor →
+    professor_profile (description, analysis_profile, quiz_qa) + course
+    materials (from test blocks) + user instructions → LLM system + user
+    prompt → Markdown guide stored in DB and returned.
+  - Analysis: past exam + handouts in one block → Gemini (JSON mode) →
+    CourseTestAnalysis row + Professor.analysis_profile re-aggregated.
+
+STACK
+-----
+  Frontend (React/Vite) talks to backend (FastAPI) over /api. File uploads
+  and guide creation go through the API; no direct DB access from the client.
+  SQLite holds users, courses, professors, attachments, tests, analyses,
+  and guides. Gemini is used for guide generation and for test-handout
+  analysis (and for generating the professor quiz questions).
+
+
+================================================================================
   ENTREPRENEURSHIP ANGLE
 ================================================================================
 
@@ -136,7 +179,40 @@ Files: backend/app/services/analysis_service.py,
        backend/app/api/courses.py (POST /courses/{id}/tests/{test_id}/analyze)
 
 --------------------------------------------------------------------------------
-3. COURSE & PROFESSOR MANAGEMENT
+3. PROFESSOR STUDY-GUIDE QUIZ
+--------------------------------------------------------------------------------
+Per-professor quiz so the student can record what they know about a professor
+(exam style, emphasis, weak areas, format preferences). That context is passed
+into the LLM when generating study guides.
+
+How it works:
+  - Professor model has a JSON column study_guide_quiz: { "questions": [ { "id":
+    "q1", "text": "..." }, ... ], "answers": { "q1": "user answer", ... } }.
+  - POST /professors/{id}/quiz/generate: calls Gemini to generate 5 short
+    study-guide–oriented questions; stores them (and empty answers) on the
+    professor.
+  - PATCH /professors/{id}/quiz/answers: updates only the answers dict;
+    questions stay fixed (stable ids q1–q5).
+  - When building professor_profile for guide generation (create_guide and
+    create_guide_from_block), if the professor has study_guide_quiz with both
+    questions and answers, a quiz_qa list (question + answer pairs) is added to
+    the profile and injected into the system instruction so the LLM can tailor
+    the guide to the student’s answers.
+
+Frontend: "Quiz" entry point from the professors list and from the edit
+professor page → /professors/:id/quiz. Page loads professor; if no questions,
+user clicks "Generate 5 questions"; then they fill answers and save. Optional
+regenerate clears questions and allows generating again.
+
+Files: backend/app/models/course.py (Professor.study_guide_quiz),
+       backend/app/api/courses.py (quiz/generate, quiz/answers),
+       backend/app/api/guides.py (professor_profile + quiz_qa),
+       backend/app/services/llm_service.py (generate_professor_quiz_questions),
+       frontend/src/pages/ProfessorQuiz.jsx, frontend/src/api/courses.js
+Migration: backend/scripts/migrate_professor_study_guide_quiz.py
+
+--------------------------------------------------------------------------------
+4. COURSE & PROFESSOR MANAGEMENT
 --------------------------------------------------------------------------------
 Students organize their courses and professors before generating guides.
 
@@ -155,7 +231,7 @@ Professor profiles:
 Files: backend/app/models/course.py, backend/app/api/courses.py
 
 --------------------------------------------------------------------------------
-4. TEST BLOCK ORGANIZATION (COURSE MATERIALS)
+5. TEST BLOCK ORGANIZATION (COURSE MATERIALS)
 --------------------------------------------------------------------------------
 Within each course, students create "test blocks" — one per past exam. Each
 block can contain:
@@ -177,7 +253,7 @@ Files: backend/app/models/course.py (CourseTest, CourseAttachmentTest),
        frontend/src/pages/EditCourse.jsx
 
 --------------------------------------------------------------------------------
-5. USER AUTHENTICATION SYSTEM
+6. USER AUTHENTICATION SYSTEM
 --------------------------------------------------------------------------------
 Full auth stack built from scratch:
   - Registration with email verification (6-digit code OR token link, 24hr expiry)
@@ -196,7 +272,7 @@ Security choices:
 Files: backend/app/api/auth.py, backend/app/services/auth_service.py
 
 --------------------------------------------------------------------------------
-6. MULTI-FORMAT FILE PARSING
+7. MULTI-FORMAT FILE PARSING
 --------------------------------------------------------------------------------
 Students upload files in whatever format they have them. The app extracts
 plain text from:
@@ -213,7 +289,7 @@ binary files.
 Files: backend/app/services/file_parser.py
 
 --------------------------------------------------------------------------------
-7. DATABASE DESIGN & MIGRATIONS
+8. DATABASE DESIGN & MIGRATIONS
 --------------------------------------------------------------------------------
 SQLAlchemy ORM with SQLite (easily swappable to PostgreSQL via DATABASE_URL).
 
@@ -233,7 +309,7 @@ runs until the new code deploys, at which point the column appears atomically.
 Files: backend/app/models/, backend/scripts/migrate_*.py, backend/app/main.py
 
 --------------------------------------------------------------------------------
-8. ADMIN PANEL
+9. ADMIN PANEL
 --------------------------------------------------------------------------------
 A password-protected admin view (is_admin flag set via ADMIN_USER_IDS env var)
 lets the app operator see all users and their guide counts, and delete accounts.
@@ -241,7 +317,7 @@ lets the app operator see all users and their guide counts, and delete accounts.
 Files: backend/app/api/admin.py, frontend/src/pages/Admin.jsx
 
 --------------------------------------------------------------------------------
-9. FRONTEND ARCHITECTURE
+10. FRONTEND ARCHITECTURE
 --------------------------------------------------------------------------------
 React + Vite SPA with:
   - React Router for client-side navigation
@@ -257,7 +333,7 @@ layer (src/api/*.js) — UI components never make raw fetch() calls.
 Files: frontend/src/
 
 --------------------------------------------------------------------------------
-10. DEPLOYMENT & CONFIGURATION
+11. DEPLOYMENT & CONFIGURATION
 --------------------------------------------------------------------------------
   - All secrets/config via environment variables (no hardcoded keys)
   - CORS configured for both local dev and production domain
@@ -291,7 +367,7 @@ Files: frontend/src/
   - "Allow multiple blocks" toggle for shared handouts
   - Study guide generation automatically pulls from course materials by nickname
 
-[ANALYSIS PIPELINE UPDATE]  <-- most recently implemented
+[ANALYSIS PIPELINE UPDATE]
   - Test-handout correlation analysis via Gemini (JSON mode)
   - Extracts: topic frequency, conversion patterns, question formats,
     high-signal handouts, plain-English summary
@@ -300,6 +376,30 @@ Files: frontend/src/
   - Analysis data injected into study guide system instruction and user prompt
   - Auto-analysis of unanalyzed blocks when a study guide is generated
   - Idempotent DB migration + startup auto-column hooks for safe deployment
+
+[PROFESSOR STUDY-GUIDE QUIZ]  <-- most recently implemented
+  - Per-professor quiz: 5 AI-generated questions (exam style, emphasis, etc.)
+  - Stored in Professor.study_guide_quiz (JSON); editable answers anytime
+  - POST /professors/{id}/quiz/generate and PATCH .../quiz/answers
+  - Quiz Q&A passed into study guide generation as quiz_qa in professor_profile
+  - Frontend: Quiz button on professors list and edit page → /professors/:id/quiz
+  - Generate questions, fill answers, save; optional regenerate questions
+  - Migration script: backend/scripts/migrate_professor_study_guide_quiz.py
+
+
+================================================================================
+  WHAT TO TRY WHEN GRADING
+================================================================================
+
+  - Register → verify email (check console if SMTP not set) → create a
+    professor → open Quiz, generate 5 questions, fill and save answers.
+  - Create a course, link professor, add a test block with a past exam and
+    handouts (PDF/TXT), click "Analyze block," then create a study guide
+    for that course and see how the guide reflects analysis + quiz context.
+  - Drag-and-drop in Edit Course to reorder test blocks and move files.
+  - Settings: change password, delete account. Admin (if ADMIN_USER_IDS set):
+    view users, delete accounts.
+  - Dark/light theme toggle (persisted).
 
 
 ================================================================================

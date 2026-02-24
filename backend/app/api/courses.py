@@ -27,6 +27,7 @@ from app.schemas.courses import (
     CourseTestAnalysisResponse,
 )
 from app.api.deps import get_current_user
+from app.services.file_parser import _resolve_file_path
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 settings = get_settings()
@@ -448,7 +449,7 @@ def duplicate_attachment(
     ).first()
     if not att:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
-    path = Path(att.file_path)
+    path = _resolve_file_path(att.file_path)
     if not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk")
     existing_count = db.query(CourseAttachment).filter(CourseAttachment.course_id == course_id).count()
@@ -508,7 +509,7 @@ def delete_attachment(
     affected_test_ids = [r.test_id for r in link_rows]
     if affected_test_ids:
         db.query(CourseTestAnalysis).filter(CourseTestAnalysis.test_id.in_(affected_test_ids)).delete(synchronize_session=False)
-    path = Path(att.file_path)
+    path = _resolve_file_path(att.file_path)
     if path.is_file():
         path.unlink()
     db.delete(att)
@@ -524,7 +525,7 @@ def delete_syllabus(
     course = _get_course_or_404(course_id, current_user.id, db)
     if not course.syllabus_file_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No syllabus file")
-    path = Path(course.syllabus_file_path)
+    path = _resolve_file_path(course.syllabus_file_path)
     if path.is_file():
         path.unlink()
     course.syllabus_file_path = None
@@ -545,7 +546,7 @@ def get_attachment_file(
     ).first()
     if not att:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
-    path = Path(att.file_path)
+    path = _resolve_file_path(att.file_path)
     if not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
     return FileResponse(path, filename=att.file_name, media_type="application/octet-stream")
@@ -560,7 +561,7 @@ def get_syllabus_file(
     course = _get_course_or_404(course_id, current_user.id, db)
     if not course.syllabus_file_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No syllabus file")
-    path = Path(course.syllabus_file_path)
+    path = _resolve_file_path(course.syllabus_file_path)
     if not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Syllabus file not found")
     filename = path.name
@@ -680,6 +681,14 @@ async def add_course_files(
     return result
 
 
+def _professor_name(course: Course) -> str | None:
+    """Safely get professor name; returns None if missing or on any access error."""
+    try:
+        return course.professor.name if course.professor else None
+    except Exception:
+        return None
+
+
 @router.get("", response_model=list[CourseListItem])
 def list_my_courses(
     db: Session = Depends(get_db),
@@ -691,7 +700,7 @@ def list_my_courses(
             id=c.id,
             official_name=c.official_name,
             nickname=c.nickname,
-            professor_name=c.professor.name if c.professor else None,
+            professor_name=_professor_name(c),
         )
         for c in courses
     ]
@@ -709,7 +718,7 @@ def get_course(
         official_name=course.official_name,
         nickname=course.nickname,
         professor_id=course.professor_id,
-        professor_name=course.professor.name if course.professor else None,
+        professor_name=_professor_name(course),
         syllabus_file_path=course.syllabus_file_path,
         personal_description=course.personal_description,
         created_at=course.created_at,
