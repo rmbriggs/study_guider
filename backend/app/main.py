@@ -32,6 +32,20 @@ def _ensure_allow_multiple_blocks_column():
         pass
 
 
+def _ensure_analysis_columns():
+    """Add professors.analysis_profile if missing (added with analysis feature)."""
+    try:
+        with engine.connect() as conn:
+            inspector = inspect(engine)
+            if "professors" in inspector.get_table_names():
+                columns = [c["name"] for c in inspector.get_columns("professors")]
+                if "analysis_profile" not in columns:
+                    conn.execute(text("ALTER TABLE professors ADD COLUMN analysis_profile JSON"))
+                    conn.commit()
+    except Exception:
+        pass
+
+
 def _sync_admin_users():
     """Set is_admin=True for user IDs listed in ADMIN_USER_IDS (comma-separated)."""
     ids_str = (settings.admin_user_ids or "").strip()
@@ -60,6 +74,7 @@ app = FastAPI(title="CourseMind API", version="1.0.0")
 @app.on_event("startup")
 def on_startup():
     _ensure_allow_multiple_blocks_column()
+    _ensure_analysis_columns()
     _sync_admin_users()
 app.add_middleware(
     CORSMiddleware,
