@@ -65,10 +65,8 @@ function AttachmentRow({
   const [editingName, setEditingName] = useState(false)
   const [editNameValue, setEditNameValue] = useState(att.file_name)
   const [renameLoading, setRenameLoading] = useState(false)
-  const [contextMenu, setContextMenu] = useState(null)
   const [duplicating, setDuplicating] = useState(false)
   const menuWrapRef = useRef(null)
-  const contextMenuRef = useRef(null)
   const testIds = getAttachmentTestIds(att)
   const alsoInNames = allowMultipleBlocks
     ? testIds
@@ -99,23 +97,9 @@ function AttachmentRow({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [menuOpen])
 
-  useEffect(() => {
-    if (!contextMenu) return
-    const onPointerDown = (e) => {
-      if (contextMenuRef.current && contextMenuRef.current.contains(e.target)) return
-      setContextMenu(null)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [contextMenu])
-
   return (
     <li
       ref={setNodeRef}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        setContextMenu({ x: e.clientX, y: e.clientY })
-      }}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -267,6 +251,26 @@ function AttachmentRow({
                 Rename
               </button>
             )}
+            {onDuplicate && (
+              <button
+                type="button"
+                className="select-option"
+                role="menuitem"
+                disabled={duplicating}
+                onClick={async () => {
+                  setMenuOpen(false)
+                  setDuplicating(true)
+                  try {
+                    await onDuplicate(att)
+                    onReload()
+                  } finally {
+                    setDuplicating(false)
+                  }
+                }}
+              >
+                {duplicating ? 'Duplicating…' : 'Duplicate'}
+              </button>
+            )}
             <div style={{ padding: '6px 10px', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>
               Assign to
             </div>
@@ -300,41 +304,6 @@ function AttachmentRow({
           </div>
         )}
       </div>
-      {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          className="select-menu"
-          role="menu"
-          style={{
-            position: 'fixed',
-            left: contextMenu.x,
-            top: contextMenu.y,
-            minWidth: 160,
-            zIndex: 1000,
-          }}
-        >
-          {onDuplicate && (
-            <button
-              type="button"
-              className="select-option"
-              role="menuitem"
-              disabled={duplicating}
-              onClick={async () => {
-                setDuplicating(true)
-                try {
-                  await onDuplicate(att)
-                  setContextMenu(null)
-                  onReload()
-                } finally {
-                  setDuplicating(false)
-                }
-              }}
-            >
-              {duplicating ? 'Duplicating…' : 'Duplicate'}
-            </button>
-          )}
-        </div>
-      )}
     </li>
   )
 }
@@ -589,9 +558,9 @@ export default function EditCourse() {
   const [deletingId, setDeletingId] = useState(null)
   const [renamingFileId, setRenamingFileId] = useState(null)
   const [renamingFileValue, setRenamingFileValue] = useState('')
-  const [filesContextMenu, setFilesContextMenu] = useState(null)
-  const [filesContextMenuDuplicating, setFilesContextMenuDuplicating] = useState(false)
-  const filesContextMenuRef = useRef(null)
+  const [filesMenuOpenId, setFilesMenuOpenId] = useState(null)
+  const [filesMenuDuplicating, setFilesMenuDuplicating] = useState(false)
+  const filesMenuWrapRef = useRef(null)
   const handoutsInputRef = useRef(null)
   const pastTestsInputRef = useRef(null)
   const notesInputRef = useRef(null)
@@ -786,27 +755,27 @@ export default function EditCourse() {
   }
 
   const handleDuplicateFromFiles = async (itemId) => {
-    setFilesContextMenuDuplicating(true)
+    setFilesMenuDuplicating(true)
     try {
       await duplicateAttachment(courseId, itemId)
       loadMaterials()
-      setFilesContextMenu(null)
+      setFilesMenuOpenId(null)
     } catch (err) {
       setFilesError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to duplicate file'))
     } finally {
-      setFilesContextMenuDuplicating(false)
+      setFilesMenuDuplicating(false)
     }
   }
 
   useEffect(() => {
-    if (!filesContextMenu) return
+    if (filesMenuOpenId == null) return
     const onPointerDown = (e) => {
-      if (filesContextMenuRef.current && filesContextMenuRef.current.contains(e.target)) return
-      setFilesContextMenu(null)
+      if (filesMenuWrapRef.current && filesMenuWrapRef.current.contains(e.target)) return
+      setFilesMenuOpenId(null)
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [filesContextMenu])
+  }, [filesMenuOpenId])
 
   const uncategorizedAttachments = (materials.attachments || []).filter((a) => getAttachmentTestIds(a).length === 0)
   const courseId = Number(id)
@@ -1013,7 +982,6 @@ export default function EditCourse() {
                   {items.map((item) => (
                     <li
                       key={item.id}
-                      onContextMenu={key !== 'syllabus' ? (e) => { e.preventDefault(); setFilesContextMenu({ x: e.clientX, y: e.clientY, itemId: item.id }) } : undefined}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1075,6 +1043,38 @@ export default function EditCourse() {
                         >
                           <Trash2 size={14} />
                         </button>
+                        {key !== 'syllabus' && (
+                          <div ref={filesMenuOpenId === item.id ? filesMenuWrapRef : null} style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              className="btn btn-ghost"
+                              style={{ padding: '4px 6px' }}
+                              onClick={() => setFilesMenuOpenId((id) => (id === item.id ? null : item.id))}
+                              aria-haspopup="menu"
+                              aria-expanded={filesMenuOpenId === item.id}
+                              title="More"
+                            >
+                              <MoreVertical size={14} />
+                            </button>
+                            {filesMenuOpenId === item.id && (
+                              <div
+                                className="select-menu"
+                                role="menu"
+                                style={{ right: 0, left: 'auto', minWidth: 140 }}
+                              >
+                                <button
+                                  type="button"
+                                  className="select-option"
+                                  role="menuitem"
+                                  disabled={filesMenuDuplicating}
+                                  onClick={() => handleDuplicateFromFiles(item.id)}
+                                >
+                                  {filesMenuDuplicating ? 'Duplicating…' : 'Duplicate'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </li>
                   ))}
@@ -1083,30 +1083,6 @@ export default function EditCourse() {
             </div>
           )
         })}
-        {filesContextMenu && (
-          <div
-            ref={filesContextMenuRef}
-            className="select-menu"
-            role="menu"
-            style={{
-              position: 'fixed',
-              left: filesContextMenu.x,
-              top: filesContextMenu.y,
-              minWidth: 160,
-              zIndex: 1000,
-            }}
-          >
-            <button
-              type="button"
-              className="select-option"
-              role="menuitem"
-              disabled={filesContextMenuDuplicating}
-              onClick={() => handleDuplicateFromFiles(filesContextMenu.itemId)}
-            >
-              {filesContextMenuDuplicating ? 'Duplicating…' : 'Duplicate'}
-            </button>
-          </div>
-        )}
       </div>
 
       <div style={{ maxWidth: 1200, width: '100%' }}>
