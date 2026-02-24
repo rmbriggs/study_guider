@@ -31,9 +31,7 @@ export async function getCourse(id) {
 }
 
 export async function createCourse(formData) {
-  const { data } = await api.post('/courses', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  const { data } = await api.post('/courses', formData)
   return data
 }
 
@@ -119,9 +117,7 @@ export async function downloadSyllabus(courseId, filename) {
 
 /** Add files to an existing course. formData should have handouts[], past_tests[], notes[] (FileList or File[]) */
 export async function addCourseFiles(courseId, formData) {
-  const { data } = await api.post(`/courses/${courseId}/files`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  const { data } = await api.post(`/courses/${courseId}/files`, formData)
   return data
 }
 

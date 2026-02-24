@@ -16,8 +16,6 @@ export async function getGuide(id) {
 }
 
 export async function createGuide(formData) {
-  const { data } = await api.post('/guides', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  const { data } = await api.post('/guides', formData)
   return data
 }
