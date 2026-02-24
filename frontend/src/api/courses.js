@@ -30,6 +30,11 @@ export async function updateProfessorQuizAnswers(professorId, answers) {
   return data
 }
 
+export async function deleteProfessorQuiz(professorId) {
+  const { data } = await api.delete(`/courses/professors/${professorId}/quiz`)
+  return data
+}
+
 export async function getCourses() {
   const { data } = await api.get('/courses')
   return data

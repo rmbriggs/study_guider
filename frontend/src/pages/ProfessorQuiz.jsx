@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, ClipboardList, RefreshCw } from 'lucide-react'
-import { getProfessor, generateProfessorQuiz, updateProfessorQuizAnswers } from '../api/courses'
+import { ArrowLeft, ClipboardList, RefreshCw, Trash2 } from 'lucide-react'
+import { getProfessor, generateProfessorQuiz, updateProfessorQuizAnswers, deleteProfessorQuiz } from '../api/courses'
 import { getApiErrorMessage } from '../utils/apiError'
 import Button from '../components/Button'
 
@@ -12,6 +12,7 @@ export default function ProfessorQuiz() {
   const [fetching, setFetching] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
   const [answers, setAnswers] = useState({})
 
@@ -78,6 +79,21 @@ export default function ProfessorQuiz() {
       setError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to save answers'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDeleteQuiz = async () => {
+    if (!window.confirm('Delete this quiz? You can generate a new one anytime.')) return
+    setError('')
+    setDeleting(true)
+    try {
+      const updated = await deleteProfessorQuiz(Number(id))
+      setProfessor(updated)
+      setAnswers({})
+    } catch (err) {
+      setError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to delete quiz'))
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -181,13 +197,17 @@ export default function ProfessorQuiz() {
                 ))}
               </div>
               {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                 <Button variant="accent" onClick={handleSaveAnswers} disabled={saving}>
                   {saving ? 'Saving…' : 'Save answers'}
                 </Button>
                 <Button variant="secondary" onClick={handleRegenerate} disabled={generating}>
                   <RefreshCw size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
                   Regenerate questions
+                </Button>
+                <Button variant="secondary" onClick={handleDeleteQuiz} disabled={deleting} style={{ marginLeft: 'auto' }}>
+                  <Trash2 size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                  {deleting ? 'Deleting…' : 'Delete quiz'}
                 </Button>
               </div>
             </>

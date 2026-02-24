@@ -178,6 +178,24 @@ def update_professor_quiz_answers(
     return professor
 
 
+@router.delete("/professors/{professor_id}/quiz", response_model=ProfessorResponse)
+def delete_professor_quiz(
+    professor_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    professor = db.query(Professor).filter(
+        Professor.id == professor_id,
+        Professor.user_id == current_user.id,
+    ).first()
+    if not professor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professor not found")
+    professor.study_guide_quiz = None
+    db.commit()
+    db.refresh(professor)
+    return professor
+
+
 # ---- Courses ----
 def _get_course_or_404(course_id: int, user_id: int, db: Session) -> Course:
     course = db.query(Course).filter(
