@@ -1,3 +1,4 @@
+import shutil
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
@@ -293,6 +294,61 @@ def update_attachment(
     test_ids = sorted({r.test_id for r in link_rows} | ({att.test_id} if att.test_id is not None else set()))
     base = CourseAttachmentResponse.model_validate(att).model_dump()
     base["test_ids"] = test_ids
+    return CourseAttachmentResponse(**base)
+
+
+@router.post("/{course_id}/attachments/{attachment_id}/duplicate", response_model=CourseAttachmentResponse)
+def duplicate_attachment(
+    course_id: int,
+    attachment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_course_or_404(course_id, current_user.id, db)
+    att = db.query(CourseAttachment).filter(
+        CourseAttachment.id == attachment_id,
+        CourseAttachment.course_id == course_id,
+    ).first()
+    if not att:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+    path = Path(att.file_path)
+    if not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk")
+    existing_count = db.query(CourseAttachment).filter(CourseAttachment.course_id == course_id).count()
+    if existing_count >= MAX_COURSE_FILES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Maximum {MAX_COURSE_FILES} total files per course.",
+        )
+    course_upload_dir = path.parent
+    safe_name = f"{uuid.uuid4().hex}_{path.name}"[:200]
+    new_path = course_upload_dir / safe_name
+    shutil.copy2(path, new_path)
+    copy_name = (att.file_name or "file").strip()
+    if not copy_name.lower().startswith("copy of "):
+        copy_name = f"Copy of {copy_name}"
+    copy_name = copy_name[:255]
+    link_rows = db.query(CourseAttachmentTest).filter(CourseAttachmentTest.attachment_id == att.id).all()
+    test_ids = [r.test_id for r in link_rows] if link_rows else ([att.test_id] if att.test_id else [])
+    new_att = CourseAttachment(
+        course_id=course_id,
+        test_id=test_ids[0] if test_ids else None,
+        file_name=copy_name,
+        file_type=att.file_type,
+        file_path=str(new_path),
+        attachment_kind=att.attachment_kind,
+        allow_multiple_blocks=False,
+    )
+    db.add(new_att)
+    db.flush()
+    for tid in test_ids:
+        db.add(CourseAttachmentTest(attachment_id=new_att.id, test_id=tid))
+    db.commit()
+    db.refresh(new_att)
+    link_rows_new = db.query(CourseAttachmentTest).filter(CourseAttachmentTest.attachment_id == new_att.id).all()
+    out_test_ids = sorted({r.test_id for r in link_rows_new})
+    base = CourseAttachmentResponse.model_validate(new_att).model_dump()
+    base["test_ids"] = out_test_ids
     return CourseAttachmentResponse(**base)
 
 

@@ -70,6 +70,11 @@ export async function deleteAttachment(courseId, attachmentId) {
   await api.delete(`/courses/${courseId}/attachments/${attachmentId}`)
 }
 
+export async function duplicateAttachment(courseId, attachmentId) {
+  const { data } = await api.post(`/courses/${courseId}/attachments/${attachmentId}/duplicate`)
+  return data
+}
+
 export async function deleteSyllabus(courseId) {
   await api.delete(`/courses/${courseId}/syllabus`)
 }
