@@ -1,0 +1,317 @@
+================================================================================
+  CourseMind — Feature Overview for Grader
+  Tech & Entrepreneurship Class Project
+================================================================================
+
+WHAT IS THIS?
+-------------
+CourseMind is a full-stack AI-powered study tool that generates personalized
+study guides from a student's actual course materials (past exams, handouts,
+notes). It learns how each professor writes exams over time, so each study
+guide is tailored to *that specific professor's* testing patterns — not generic
+content from the internet.
+
+The app is live at https://www.coursemind.app
+
+
+================================================================================
+  ENTREPRENEURSHIP ANGLE
+================================================================================
+
+THE PROBLEM
+-----------
+Students spend hours making study guides that are too broad, cover the wrong
+material, or use the wrong framing for their specific professor. A student in
+Biology 101 needs a very different guide than a student in Organic Chemistry —
+even if the topic is "cell division" — because professors test differently.
+Generic AI tools (ChatGPT, etc.) don't know what *this professor* tests.
+
+THE SOLUTION
+------------
+CourseMind ingests a student's actual course artifacts — their professor's
+handouts, their own notes, and past exams from previous semesters — and uses
+an LLM (Google Gemini) to generate a study guide that:
+  - Prioritizes exactly what has appeared on this professor's past exams
+  - Uses the professor's own terminology from their handouts
+  - Flags topics the professor has NOT yet tested (lower priority)
+  - Generates practice questions in the same style/format as real past exams
+
+MOAT / DIFFERENTIATION
+-----------------------
+The core competitive advantage builds over time: the more test blocks a student
+analyzes, the richer the "professor profile" becomes. The system aggregates
+exam patterns across semesters to compute topic frequency, question format
+preferences, and conversion patterns (does the professor test verbatim
+definitions, conceptual understanding, or application to new scenarios?). This
+data compounds — each new analyzed test makes the next study guide smarter.
+
+This is a classic data-network-effect moat: the product gets meaningfully
+better the more a student (or their friends) use it with a given professor.
+
+TARGET USERS
+------------
+College students who:
+  - Have access to past exams (from the professor, course website, or upperclassmen)
+  - Want to study efficiently rather than comprehensively
+  - Are grade-focused and want to optimize for what will actually be on the test
+
+BUSINESS MODEL (hypothetical)
+------------------------------
+  - Freemium: limited study guides per month for free users
+  - Paid tier: unlimited guides, analysis history, shared professor profiles
+  - Institutional: partner with universities to provide professor-approved
+    content directly, replacing the "past exam" upload step
+
+
+================================================================================
+  TECHNICAL FEATURES
+================================================================================
+
+--------------------------------------------------------------------------------
+1. AI STUDY GUIDE GENERATION
+--------------------------------------------------------------------------------
+The core feature. A student uploads their course materials, and the app calls
+Google Gemini 1.5 Flash to generate a structured study guide.
+
+How it works technically:
+  - The prompt is assembled in a modular architecture (llm_service.py) that
+    treats each material type differently:
+      * Past exams → highest priority signal; every tested topic MUST appear
+      * Handouts → authoritative definitions and terminology
+      * Student notes → supporting context, lower weight
+      * Previous study guides → structural reference only
+  - Source weighting is injected into the system instruction so the model
+    applies consistent priority rules across all decisions
+  - The user turn includes all source material, grouped and labeled by type,
+    with per-type instructions embedded before each section
+  - Output is structured Markdown with: Overview, Topics (each labeled
+    HIGH/MEDIUM/LOW priority), High-Priority Checklist, Practice Questions,
+    Coverage Gaps
+  - Text truncation logic (12k chars per source, 72k total) prevents context
+    overflow on large uploads
+  - Supports PDF, DOCX, RTF, ODT, HTML, TXT, MD — each parsed by a dedicated
+    extractor (file_parser.py)
+
+Files: backend/app/services/llm_service.py, backend/app/api/guides.py
+
+--------------------------------------------------------------------------------
+2. TEST-HANDOUT CORRELATION ANALYSIS  [NEWEST FEATURE]
+--------------------------------------------------------------------------------
+After a student uploads both a past exam AND the handouts that were taught
+before that exam, they can click "Analyze block" to run an LLM analysis that
+correlates the two documents.
+
+What the analysis produces:
+  - topic_frequency: how many exam questions came from each topic
+  - conversion_patterns: does the professor test verbatim recall, conceptual
+    understanding, or application to new scenarios?
+  - question_formats: how many multiple-choice vs. free response vs. problems
+  - high_signal_handouts: which specific handout files contributed the most
+    questions (so students know which handouts to prioritize)
+  - summary: a 2-3 sentence human-readable description of this professor's
+    exam style
+
+Gemini is called in JSON mode (response_mime_type="application/json") so the
+response can be parsed and stored as structured data rather than freeform text.
+
+PROFESSOR PROFILE AGGREGATION:
+After each analysis, the system re-aggregates all analyses for that professor
+across all courses and semesters into a single professor.analysis_profile:
+  - tested_topics: sorted by frequency, with Laplace-smoothed confidence score
+    (confidence = n / (n+2), so early results are appropriately hedged)
+  - preferred_formats: aggregate question format breakdown
+  - test_pairs_analyzed: how many past-exam/handout pairs have been analyzed
+
+This profile is then injected into the system instruction of every future
+study guide for that professor, giving the LLM explicit historical data about
+what to prioritize.
+
+AUTOMATIC ANALYSIS IN STUDY GUIDES:
+When a student generates a study guide for a course, the system automatically
+runs analysis on any unanalyzed test blocks in that course — so the study guide
+benefits from all available historical data, even if the student forgot to
+click "Analyze block" manually.
+
+Files: backend/app/services/analysis_service.py,
+       backend/app/api/courses.py (POST /courses/{id}/tests/{test_id}/analyze)
+
+--------------------------------------------------------------------------------
+3. COURSE & PROFESSOR MANAGEMENT
+--------------------------------------------------------------------------------
+Students organize their courses and professors before generating guides.
+
+Course features:
+  - Official name + short nickname (used to link guides to courses)
+  - Link to a professor profile
+  - Personal description ("what I've noticed about this class")
+  - Syllabus upload
+
+Professor profiles:
+  - Name, specialties, teaching style description
+  - These are injected into the LLM system prompt so the model mirrors
+    the professor's terminology and reasoning style
+  - The analysis_profile field accumulates historical exam data over time
+
+Files: backend/app/models/course.py, backend/app/api/courses.py
+
+--------------------------------------------------------------------------------
+4. TEST BLOCK ORGANIZATION (COURSE MATERIALS)
+--------------------------------------------------------------------------------
+Within each course, students create "test blocks" — one per past exam. Each
+block can contain:
+  - The past exam itself (past_test kind)
+  - The handouts taught before that exam (handout kind)
+  - Student notes (note kind)
+
+The many-to-many file assignment (CourseAttachmentTest junction table) means
+a handout can appear in multiple test blocks — useful when the same material
+was covered across multiple exam periods.
+
+UI features (EditCourse.jsx):
+  - Drag-and-drop to reorder test blocks or move files between blocks
+  - Rename sections and files inline
+  - Duplicate files (physical file copy on disk + new DB record)
+  - Download any file with authenticated request
+
+Files: backend/app/models/course.py (CourseTest, CourseAttachmentTest),
+       frontend/src/pages/EditCourse.jsx
+
+--------------------------------------------------------------------------------
+5. USER AUTHENTICATION SYSTEM
+--------------------------------------------------------------------------------
+Full auth stack built from scratch:
+  - Registration with email verification (6-digit code OR token link, 24hr expiry)
+  - Login with HttpOnly secure cookies (JWT)
+  - "Stay signed in" toggle (session cookie vs. persistent)
+  - Password reset via emailed token (15-minute expiry)
+  - Account deletion (cascades to all courses, guides, analyses)
+  - Study guide creation gated behind email verification
+
+Security choices:
+  - Passwords hashed with bcrypt (via passlib)
+  - JWT tokens stored in HttpOnly cookies (not localStorage) to prevent XSS
+  - Secure + SameSite cookie flags configurable per environment
+  - Reset tokens stored as SHA-256 hashes (not plaintext) in the database
+
+Files: backend/app/api/auth.py, backend/app/services/auth_service.py
+
+--------------------------------------------------------------------------------
+6. MULTI-FORMAT FILE PARSING
+--------------------------------------------------------------------------------
+Students upload files in whatever format they have them. The app extracts
+plain text from:
+  - PDF → pypdf
+  - DOCX → python-docx
+  - RTF → striprtf
+  - ODT → odf library
+  - HTML → custom HTMLParser subclass (strips tags, preserves text)
+  - TXT, MD → direct UTF-8 read
+
+This extracted text is what gets sent to the LLM — the LLM never sees raw
+binary files.
+
+Files: backend/app/services/file_parser.py
+
+--------------------------------------------------------------------------------
+7. DATABASE DESIGN & MIGRATIONS
+--------------------------------------------------------------------------------
+SQLAlchemy ORM with SQLite (easily swappable to PostgreSQL via DATABASE_URL).
+
+Key design decisions:
+  - CourseAttachmentTest is an explicit junction model (not just a secondary
+    table) so we can add metadata to the relationship later if needed
+  - CourseTestAnalysis is one-to-one with CourseTest (unique constraint on
+    test_id), enforcing a single canonical analysis per test block
+  - analysis_profile on Professor is a JSON column — flexible for evolving
+    the aggregation schema without new migrations
+
+Migration strategy: rather than a migration framework (like Alembic), the app
+uses idempotent startup hooks (in main.py) that ADD missing columns on boot.
+This means zero-downtime deploys never fail due to schema lag — the old code
+runs until the new code deploys, at which point the column appears atomically.
+
+Files: backend/app/models/, backend/scripts/migrate_*.py, backend/app/main.py
+
+--------------------------------------------------------------------------------
+8. ADMIN PANEL
+--------------------------------------------------------------------------------
+A password-protected admin view (is_admin flag set via ADMIN_USER_IDS env var)
+lets the app operator see all users and their guide counts, and delete accounts.
+
+Files: backend/app/api/admin.py, frontend/src/pages/Admin.jsx
+
+--------------------------------------------------------------------------------
+9. FRONTEND ARCHITECTURE
+--------------------------------------------------------------------------------
+React + Vite SPA with:
+  - React Router for client-side navigation
+  - Axios API client with credentials (cookie auth)
+  - AuthContext for global user state
+  - ThemeContext for dark/light mode (persisted to localStorage)
+  - @dnd-kit for drag-and-drop (accessible, headless)
+  - Modular component library (Button, Input, Select, Modal)
+
+The frontend communicates with the backend exclusively through a typed API
+layer (src/api/*.js) — UI components never make raw fetch() calls.
+
+Files: frontend/src/
+
+--------------------------------------------------------------------------------
+10. DEPLOYMENT & CONFIGURATION
+--------------------------------------------------------------------------------
+  - All secrets/config via environment variables (no hardcoded keys)
+  - CORS configured for both local dev and production domain
+  - upload_dir, max_file_size_mb, allowed_extensions all configurable
+  - Secure cookies toggle for HTTP (dev) vs HTTPS (prod)
+
+
+================================================================================
+  FEATURES ADDED OVER TIME (changelog for grader)
+================================================================================
+
+[INITIAL BUILD]
+  - User registration, login, logout with JWT cookies
+  - Email verification (code + link)
+  - Password reset flow
+  - Basic study guide creation from file uploads
+  - Gemini LLM integration for guide generation
+  - Professor profiles injected into system prompt
+  - PDF/DOCX/RTF/ODT/HTML/TXT parsing
+  - Guide history and viewing
+  - Dark/light theme toggle
+  - Admin panel
+
+[COURSE MANAGEMENT UPDATE]
+  - Course + professor database models
+  - Course creation with syllabus and file upload
+  - Test block sections for organizing course materials
+  - Many-to-many file-to-block assignment (CourseAttachmentTest)
+  - Drag-and-drop block and file reordering
+  - File rename, duplicate, download, delete
+  - "Allow multiple blocks" toggle for shared handouts
+  - Study guide generation automatically pulls from course materials by nickname
+
+[ANALYSIS PIPELINE UPDATE]  <-- most recently implemented
+  - Test-handout correlation analysis via Gemini (JSON mode)
+  - Extracts: topic frequency, conversion patterns, question formats,
+    high-signal handouts, plain-English summary
+  - "Analyze block" button appears on test blocks with both past exam and handouts
+  - Professor analysis_profile aggregation (Laplace-smoothed confidence scores)
+  - Analysis data injected into study guide system instruction and user prompt
+  - Auto-analysis of unanalyzed blocks when a study guide is generated
+  - Idempotent DB migration + startup auto-column hooks for safe deployment
+
+
+================================================================================
+  STACK SUMMARY
+================================================================================
+
+  Backend:   Python 3.12+ / FastAPI / SQLAlchemy / SQLite / Pydantic v2
+  AI:        Google Gemini 1.5 Flash (via google-generativeai SDK)
+  Auth:      bcrypt + JWT + HttpOnly cookies
+  Email:     Resend API
+  Files:     pypdf, python-docx, striprtf, odf
+  Frontend:  React 18 / Vite / React Router / Axios / @dnd-kit
+  Hosting:   coursemind.app (backend + frontend deployed separately)
+
+================================================================================
