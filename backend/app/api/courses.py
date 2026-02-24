@@ -3,7 +3,7 @@ import shutil
 import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from app.config import get_settings, get_upload_base
 from app.db import get_db
@@ -468,34 +468,46 @@ def duplicate_attachment(
     ).first()
     if not att:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
-    path = _resolve_file_path(att.file_path)
-    if not path.is_file():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk")
     existing_count = db.query(CourseAttachment).filter(CourseAttachment.course_id == course_id).count()
     if existing_count >= MAX_COURSE_FILES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Maximum {MAX_COURSE_FILES} total files per course.",
         )
-    course_upload_dir = path.parent
-    safe_name = f"{uuid.uuid4().hex}_{path.name}"[:200]
-    new_path = course_upload_dir / safe_name
-    shutil.copy2(path, new_path)
     copy_name = (att.file_name or "file").strip()
     if not copy_name.lower().startswith("copy of "):
         copy_name = f"Copy of {copy_name}"
     copy_name = copy_name[:255]
     link_rows = db.query(CourseAttachmentTest).filter(CourseAttachmentTest.attachment_id == att.id).all()
     test_ids = [r.test_id for r in link_rows] if link_rows else ([att.test_id] if att.test_id else [])
-    new_att = CourseAttachment(
-        course_id=course_id,
-        test_id=test_ids[0] if test_ids else None,
-        file_name=copy_name,
-        file_type=att.file_type,
-        file_path=str(new_path),
-        attachment_kind=att.attachment_kind,
-        allow_multiple_blocks=0,
-    )
+    if getattr(att, "file_content", None) is not None:
+        new_att = CourseAttachment(
+            course_id=course_id,
+            test_id=test_ids[0] if test_ids else None,
+            file_name=copy_name,
+            file_type=att.file_type,
+            file_path=att.file_path or copy_name,
+            file_content=att.file_content,
+            attachment_kind=att.attachment_kind,
+            allow_multiple_blocks=0,
+        )
+    else:
+        path = _resolve_file_path(att.file_path)
+        if not path.is_file():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk")
+        course_upload_dir = path.parent
+        safe_name = f"{uuid.uuid4().hex}_{path.name}"[:200]
+        new_path = course_upload_dir / safe_name
+        shutil.copy2(path, new_path)
+        new_att = CourseAttachment(
+            course_id=course_id,
+            test_id=test_ids[0] if test_ids else None,
+            file_name=copy_name,
+            file_type=att.file_type,
+            file_path=str(new_path),
+            attachment_kind=att.attachment_kind,
+            allow_multiple_blocks=0,
+        )
     db.add(new_att)
     db.flush()
     for tid in test_ids:
@@ -531,6 +543,7 @@ def delete_attachment(
     path = _resolve_file_path(att.file_path)
     if path.is_file():
         path.unlink()
+    # file_content is in DB only, no disk file to delete
     db.delete(att)
     db.commit()
 
@@ -542,12 +555,16 @@ def delete_syllabus(
     current_user: User = Depends(get_current_user),
 ):
     course = _get_course_or_404(course_id, current_user.id, db)
-    if not course.syllabus_file_path:
+    has_db = getattr(course, "syllabus_file_data", None) is not None
+    has_path = course.syllabus_file_path and _resolve_file_path(course.syllabus_file_path).is_file()
+    if not has_db and not has_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No syllabus file")
-    path = _resolve_file_path(course.syllabus_file_path)
-    if path.is_file():
-        path.unlink()
+    if has_path:
+        path = _resolve_file_path(course.syllabus_file_path)
+        if path.is_file():
+            path.unlink()
     course.syllabus_file_path = None
+    course.syllabus_file_data = None
     db.commit()
 
 
@@ -565,6 +582,13 @@ def get_attachment_file(
     ).first()
     if not att:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+    if getattr(att, "file_content", None) is not None:
+        filename = (att.file_name or "file").replace('"', "'")
+        return Response(
+            content=att.file_content,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
     path = _resolve_file_path(att.file_path)
     if not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
@@ -578,6 +602,15 @@ def get_syllabus_file(
     current_user: User = Depends(get_current_user),
 ):
     course = _get_course_or_404(course_id, current_user.id, db)
+    if getattr(course, "syllabus_file_data", None) is not None:
+        filename = (course.syllabus_file_path or "syllabus").replace("\\", "/").split("/")[-1]
+        if "_" in filename:
+            filename = filename.split("_", 1)[-1]
+        return Response(
+            content=course.syllabus_file_data,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
     if not course.syllabus_file_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No syllabus file")
     path = _resolve_file_path(course.syllabus_file_path)
@@ -626,13 +659,6 @@ async def add_course_files(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Maximum {MAX_COURSE_FILES} total files per course. You have {existing_count}, adding {len(all_extra)} would exceed the limit.",
         )
-    try:
-        course_upload_dir = _ensure_upload_dir(COURSE_FILES_SUBDIR)
-    except OSError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Could not create upload directory: {e}",
-        )
     max_order = db.query(CourseTest).filter(CourseTest.course_id == course_id).count()
     sort_order = max_order
     added = 0
@@ -648,15 +674,6 @@ async def add_course_files(
             skipped_size.append(upload_file.filename)
             continue
         clean_name = _sanitize_filename(upload_file.filename)
-        safe_name = f"{uuid.uuid4().hex}_{clean_name}"[:200]
-        path = course_upload_dir / safe_name
-        try:
-            path.write_bytes(content)
-        except OSError as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Could not save file '{upload_file.filename}': {e}",
-            )
         test_id = None
         if kind == CourseAttachmentType.PAST_TEST:
             section_name = (Path(clean_name).stem or "Past test").strip()[:255]
@@ -674,7 +691,8 @@ async def add_course_files(
             test_id=test_id,
             file_name=upload_file.filename,
             file_type=ext,
-            file_path=str(path),
+            file_path=clean_name,
+            file_content=content,
             attachment_kind=kind,
         )
         db.add(att)
@@ -796,32 +814,6 @@ def update_course(
     )
 
 
-async def _save_upload(f: UploadFile, upload_dir: Path) -> str:
-    ext = Path(f.filename or "").suffix.lstrip(".").lower()
-    if ext not in ALLOWED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File type .{ext} not allowed. Allowed: {', '.join(sorted(ALLOWED)).upper()}",
-        )
-    content = await f.read()
-    if len(content) > MAX_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File {f.filename} exceeds {settings.max_file_size_mb} MB",
-        )
-    clean_name = _sanitize_filename(f.filename or "file")
-    safe_name = f"{uuid.uuid4().hex}_{clean_name}"[:200]
-    path = upload_dir / safe_name
-    try:
-        path.write_bytes(content)
-    except OSError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Could not save file '{f.filename}': {e}",
-        )
-    return str(path)
-
-
 @router.post("", response_model=CourseCreateResponse)
 async def create_course(
     db: Session = Depends(get_db),
@@ -852,9 +844,22 @@ async def create_course(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professor not found")
 
     syllabus_path = None
+    syllabus_data = None
     if syllabus and syllabus.filename:
-        upload_dir = _ensure_upload_dir(SYLLABUS_SUBDIR)
-        syllabus_path = await _save_upload(syllabus, upload_dir)
+        ext = Path(syllabus.filename or "").suffix.lstrip(".").lower()
+        if ext not in ALLOWED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Syllabus file type .{ext} not allowed. Allowed: {', '.join(sorted(ALLOWED)).upper()}",
+            )
+        content = await syllabus.read()
+        if len(content) > MAX_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Syllabus file exceeds {settings.max_file_size_mb} MB",
+            )
+        syllabus_path = _sanitize_filename(syllabus.filename)
+        syllabus_data = content
 
     all_extra = [
         (h, CourseAttachmentType.HANDOUT) for h in (handouts or []) if h and h.filename
@@ -875,13 +880,13 @@ async def create_course(
         nickname=nickname,
         professor_id=professor.id if professor else None,
         syllabus_file_path=syllabus_path,
+        syllabus_file_data=syllabus_data,
         personal_description=(personal_description or "").strip() or None,
     )
     db.add(course)
     db.commit()
     db.refresh(course)
 
-    course_upload_dir = _ensure_upload_dir(COURSE_FILES_SUBDIR)
     sort_order = 0
     for upload_file, kind in all_extra:
         ext = Path(upload_file.filename).suffix.lstrip(".").lower()
@@ -891,9 +896,6 @@ async def create_course(
         if len(content) > MAX_SIZE:
             continue
         clean_name = _sanitize_filename(upload_file.filename)
-        safe_name = f"{uuid.uuid4().hex}_{clean_name}"[:200]
-        path = course_upload_dir / safe_name
-        path.write_bytes(content)
         test_id = None
         if kind == CourseAttachmentType.PAST_TEST:
             section_name = (Path(clean_name).stem or "Past test").strip()[:255]
@@ -911,7 +913,8 @@ async def create_course(
             test_id=test_id,
             file_name=upload_file.filename,
             file_type=ext,
-            file_path=str(path),
+            file_path=clean_name,
+            file_content=content,
             attachment_kind=kind,
         )
         db.add(att)

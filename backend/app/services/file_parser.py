@@ -1,3 +1,4 @@
+import tempfile
 from html.parser import HTMLParser
 from io import BytesIO
 from pathlib import Path
@@ -199,3 +200,23 @@ def extract_text_from_file(file_path: str | Path, file_type: str) -> str:
         return extract_text_from_html(path)
     # .doc (legacy binary) can be uploaded but we don't extract text here
     return ""
+
+
+def extract_text_from_bytes(content: bytes, file_type: str) -> str:
+    """Extract text from file bytes (e.g. from DB). Writes to a temp file and reuses path-based extraction."""
+    if not content or not (file_type or "").strip():
+        return ""
+    ext = (file_type or "").lower().lstrip(".")
+    suffix = f".{ext}" if ext else ""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(content)
+            tmp.flush()
+            return extract_text_from_file(tmp.name, file_type)
+    except Exception:
+        return ""
+    finally:
+        try:
+            Path(tmp.name).unlink(missing_ok=True)
+        except Exception:
+            pass

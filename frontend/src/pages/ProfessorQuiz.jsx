@@ -116,7 +116,7 @@ export default function ProfessorQuiz() {
   }
 
   const quiz = professor?.study_guide_quiz || {}
-  const questions = quiz.questions || []
+  const questions = Array.isArray(quiz.questions) ? quiz.questions : []
   const hasQuestions = questions.length > 0
 
   return (
@@ -197,18 +197,22 @@ export default function ProfessorQuiz() {
                 ))}
               </div>
               {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                <Button variant="accent" onClick={handleSaveAnswers} disabled={saving}>
-                  {saving ? 'Saving…' : 'Save answers'}
-                </Button>
-                <Button variant="secondary" onClick={handleRegenerate} disabled={generating}>
-                  <RefreshCw size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                  Regenerate questions
-                </Button>
-                <Button variant="secondary" onClick={handleDeleteQuiz} disabled={deleting} style={{ marginLeft: 'auto' }}>
-                  <Trash2 size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                  {deleting ? 'Deleting…' : 'Delete quiz'}
-                </Button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <Button variant="accent" onClick={handleSaveAnswers} disabled={saving}>
+                    {saving ? 'Saving…' : 'Save answers'}
+                  </Button>
+                  <Button variant="secondary" onClick={handleRegenerate} disabled={generating}>
+                    <RefreshCw size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                    Regenerate questions
+                  </Button>
+                </div>
+                <div>
+                  <Button variant="secondary" onClick={handleDeleteQuiz} disabled={deleting}>
+                    <Trash2 size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                    {deleting ? 'Deleting…' : 'Delete quiz'}
+                  </Button>
+                </div>
               </div>
             </>
           )}

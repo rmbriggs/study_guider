@@ -1,4 +1,3 @@
-import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
@@ -17,7 +16,7 @@ from app.schemas.guides import (
     GuideOptionsResponse,
 )
 from app.api.deps import get_current_user
-from app.services.file_parser import extract_text_from_file
+from app.services.file_parser import extract_text_from_file, extract_text_from_bytes
 from app.services.llm_service import generate_study_guide
 
 router = APIRouter(prefix="/guides", tags=["guides"])
@@ -166,18 +165,31 @@ def create_guide_from_block(
 
     try:
         for att in block_attachments:
-            path = Path(att.file_path)
-            if not path.exists():
-                continue
-            text = extract_text_from_file(path, att.file_type or "") or "(no text extracted)"
-            source = GuideSource(
-                guide_id=guide.id,
-                file_name=att.file_name,
-                file_type=att.file_type,
-                file_path=str(path),
-                extracted_text=text,
-                material_type=att.attachment_kind,
-            )
+            content = getattr(att, "file_content", None)
+            if content is not None:
+                text = extract_text_from_bytes(content, att.file_type or "") or "(no text extracted)"
+                source = GuideSource(
+                    guide_id=guide.id,
+                    file_name=att.file_name,
+                    file_type=att.file_type,
+                    file_path=att.file_name,
+                    file_content=content,
+                    extracted_text=text,
+                    material_type=att.attachment_kind,
+                )
+            else:
+                path = Path(att.file_path)
+                if not path.exists():
+                    continue
+                text = extract_text_from_file(path, att.file_type or "") or "(no text extracted)"
+                source = GuideSource(
+                    guide_id=guide.id,
+                    file_name=att.file_name,
+                    file_type=att.file_type,
+                    file_path=str(path),
+                    extracted_text=text,
+                    material_type=att.attachment_kind,
+                )
             db.add(source)
             typed_sources.append((att.attachment_kind, att.file_name, text))
 
@@ -397,7 +409,6 @@ async def create_guide(
                 if quiz_qa:
                     professor_profile["quiz_qa"] = quiz_qa
 
-    upload_dir = _ensure_upload_dir()
     guide = StudyGuide(
         user_id=current_user.id,
         title=title or "Untitled Guide",
@@ -412,7 +423,6 @@ async def create_guide(
 
     # (material_type, label, text) — order matters: past_tests feed first into the prompt
     typed_sources: list[tuple[str, str, str]] = []
-    saved_paths: list[Path] = []
     try:
         for f, material_type in typed_uploads:
             ext = Path(f.filename).suffix.lstrip(".").lower()
@@ -427,16 +437,13 @@ async def create_guide(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"File {f.filename} exceeds {settings.max_file_size_mb} MB",
                 )
-            safe_name = f"{uuid.uuid4().hex}_{f.filename}"[:200]
-            path = upload_dir / safe_name
-            path.write_bytes(content)
-            saved_paths.append(path)
-            text = extract_text_from_file(path, ext)
+            text = extract_text_from_bytes(content, ext)
             source = GuideSource(
                 guide_id=guide.id,
                 file_name=f.filename,
                 file_type=ext,
-                file_path=str(path),
+                file_path=f.filename,
+                file_content=content,
                 extracted_text=text,
                 material_type=material_type,
             )
@@ -529,20 +536,10 @@ async def create_guide(
             ),
         )
     except HTTPException:
-        for p in saved_paths:
-            try:
-                p.unlink(missing_ok=True)
-            except Exception:
-                pass
         guide.status = GuideStatus.failed.value
         db.commit()
         raise
     except Exception as e:
-        for p in saved_paths:
-            try:
-                p.unlink(missing_ok=True)
-            except Exception:
-                pass
         guide.status = GuideStatus.failed.value
         db.commit()
         raise HTTPException(

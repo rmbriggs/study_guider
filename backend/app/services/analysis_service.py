@@ -15,7 +15,7 @@ from app.models.course import (
     Professor,
     CourseAttachmentType,
 )
-from app.services.file_parser import extract_text_from_file, _resolve_file_path
+from app.services.file_parser import extract_text_from_file, extract_text_from_bytes, _resolve_file_path
 from app.services.text_sanitizer import sanitize_text_for_gemini
 
 ANALYSIS_MODEL = "gemini-2.5-flash"
@@ -122,14 +122,18 @@ def analyze_test_block(test_id: int, db: Session, api_key: str) -> CourseTestAna
     extracted: list[tuple[CourseAttachment, str]] = []
 
     def get_text(att: CourseAttachment) -> str:
-        resolved = _resolve_file_path(att.file_path)
-        if not resolved.exists():
-            out = _MISSING
+        content = getattr(att, "file_content", None)
+        if content is not None:
+            text = extract_text_from_bytes(content, att.file_type) or ""
         else:
+            resolved = _resolve_file_path(att.file_path)
+            if not resolved.exists():
+                extracted.append((att, _MISSING))
+                return _MISSING
             text = extract_text_from_file(att.file_path, att.file_type) or ""
-            if len(text) > _MAX_CHARS_PER_FILE:
-                text = text[:_MAX_CHARS_PER_FILE] + "\n\n*[truncated]*"
-            out = sanitize_text_for_gemini(text) or _NO_TEXT
+        if len(text) > _MAX_CHARS_PER_FILE:
+            text = text[:_MAX_CHARS_PER_FILE] + "\n\n*[truncated]*"
+        out = sanitize_text_for_gemini(text) or _NO_TEXT
         extracted.append((att, out))
         return out
 

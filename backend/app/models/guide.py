@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, LargeBinary
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db import Base
@@ -35,7 +35,8 @@ class GuideSource(Base):
     guide_id = Column(Integer, ForeignKey("study_guides.id"), nullable=False)
     file_name = Column(String(255), nullable=False)
     file_type = Column(String(64), nullable=False)
-    file_path = Column(String(512), nullable=True)
+    file_path = Column(String(512), nullable=True)  # legacy path or stub when stored in DB
+    file_content = Column(LargeBinary, nullable=True)  # file bytes when stored in DB (e.g. Railway)
     extracted_text = Column(Text, nullable=True)
     material_type = Column(String(32), nullable=True)  # past_test | handout | note | study_guide | other
     created_at = Column(DateTime(timezone=True), server_default=func.now())
