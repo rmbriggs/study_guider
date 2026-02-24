@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 from app.db import engine, Base, SessionLocal
 from app import models  # noqa: F401 - ensure all models registered for create_all
 from app.api.auth import router as auth_router
@@ -11,6 +12,24 @@ from app.models.user import User
 
 settings = get_settings()
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_allow_multiple_blocks_column():
+    """Add course_attachments.allow_multiple_blocks if missing (e.g. after deploy)."""
+    try:
+        with engine.connect() as conn:
+            inspector = inspect(engine)
+            if "course_attachments" not in inspector.get_table_names():
+                return
+            columns = [c["name"] for c in inspector.get_columns("course_attachments")]
+            if "allow_multiple_blocks" in columns:
+                return
+            conn.execute(text(
+                "ALTER TABLE course_attachments ADD COLUMN allow_multiple_blocks INTEGER NOT NULL DEFAULT 0"
+            ))
+            conn.commit()
+    except Exception:
+        pass
 
 
 def _sync_admin_users():
@@ -40,6 +59,7 @@ app = FastAPI(title="CourseMind API", version="1.0.0")
 
 @app.on_event("startup")
 def on_startup():
+    _ensure_allow_multiple_blocks_column()
     _sync_admin_users()
 app.add_middleware(
     CORSMiddleware,
