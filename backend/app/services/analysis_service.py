@@ -52,14 +52,15 @@ def _parse_gemini_json(raw: str) -> dict:
 
     # Try repairing unescaped newlines inside strings (Gemini often outputs these)
     s_repaired = _repair_json_strings(s)
+    last_error = None
     try:
         return json.loads(s_repaired)
     except json.JSONDecodeError as e:
-        pass
+        last_error = e
     s = s_repaired
 
     # Repair: often the response is truncated mid-string (e.g. "summary" cut off)
-    pos = getattr(e, "pos", len(s))
+    pos = getattr(last_error, "pos", len(s)) if last_error else len(s)
     if pos > len(s):
         pos = len(s)
 
@@ -84,7 +85,7 @@ def _parse_gemini_json(raw: str) -> dict:
         except json.JSONDecodeError:
             continue
 
-    raise RuntimeError(f"Failed to parse Gemini JSON response: {e}")
+    raise RuntimeError(f"Failed to parse Gemini JSON response: {last_error}")
 
 
 def analyze_test_block(test_id: int, db: Session, api_key: str) -> CourseTestAnalysis:
