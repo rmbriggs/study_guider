@@ -17,7 +17,7 @@ from app.models.course import (
 )
 from app.services.file_parser import extract_text_from_file
 
-ANALYSIS_MODEL = "gemini-1.5-flash"
+ANALYSIS_MODEL = "gemini-2.5-flash"
 _MAX_CHARS_PER_FILE = 10_000
 
 

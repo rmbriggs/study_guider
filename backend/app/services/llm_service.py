@@ -9,7 +9,7 @@ Modular design: edit MATERIAL_INSTRUCTIONS[type] or the block constants below to
 how Gemini treats any individual material type without touching the rest of the prompt.
 """
 
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # Per-source character cap before truncation (~3 k tokens each)
 _MAX_CHARS_PER_SOURCE = 12_000
