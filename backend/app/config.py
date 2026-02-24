@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # Secure cookie only over HTTPS. Set SECURE_COOKIES=false in .env for local dev (HTTP).
     secure_cookies: bool = True
 
-    # Database
+    # Database (set DATABASE_URL in production e.g. Railway Postgres)
     database_url: str = "sqlite:///./study_guider.db"
 
     # LLM (Gemini)
