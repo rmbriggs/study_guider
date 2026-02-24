@@ -22,6 +22,71 @@ ANALYSIS_MODEL = "gemini-2.5-flash"
 _MAX_CHARS_PER_FILE = 10_000
 
 
+def _repair_json_strings(s: str) -> str:
+    """Replace unescaped newlines inside double-quoted strings with \\n so JSON can parse."""
+    parts = s.split('"')
+    for i in range(1, len(parts), 2):
+        # Odd-indexed parts are inside double-quoted strings
+        parts[i] = parts[i].replace("\n", "\\n").replace("\r", "\\r")
+    return '"'.join(parts)
+
+
+def _parse_gemini_json(raw: str) -> dict:
+    """
+    Parse JSON from Gemini, repairing common issues: markdown fences,
+    unescaped newlines in strings, truncated output (unterminated string).
+    """
+    s = raw.strip()
+    # Strip markdown code block if present
+    if s.startswith("```"):
+        first = s.find("\n")
+        if first != -1:
+            s = s[first + 1 :]
+        if s.endswith("```"):
+            s = s[: s.rindex("```")].strip()
+
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        pass
+
+    # Try repairing unescaped newlines inside strings (Gemini often outputs these)
+    s_repaired = _repair_json_strings(s)
+    try:
+        return json.loads(s_repaired)
+    except json.JSONDecodeError as e:
+        pass
+    s = s_repaired
+
+    # Repair: often the response is truncated mid-string (e.g. "summary" cut off)
+    pos = getattr(e, "pos", len(s))
+    if pos > len(s):
+        pos = len(s)
+
+    # Try closing an unterminated string and the root object
+    for suffix in ('"}\n}', '"}', '}\n}'):
+        try:
+            return json.loads(s[:pos] + suffix)
+        except json.JSONDecodeError:
+            continue
+
+    # Trim backward from error position: close string and object (salvage truncated output)
+    for i in range(pos, max(0, pos - 1000), -1):
+        tail = s[i:]
+        # If we're clearly inside a string (no unescaped " in tail), close it and the object
+        if '"' not in tail or tail.strip().startswith('"'):
+            try:
+                return json.loads(s[:i].rstrip().rstrip(",") + '"}\n}')
+            except json.JSONDecodeError:
+                pass
+        try:
+            return json.loads(s[:i] + '"}\n}')
+        except json.JSONDecodeError:
+            continue
+
+    raise RuntimeError(f"Failed to parse Gemini JSON response: {e}")
+
+
 def analyze_test_block(test_id: int, db: Session, api_key: str) -> CourseTestAnalysis:
     """
     Run LLM analysis correlating handouts/notes with a past test.
@@ -137,10 +202,7 @@ def analyze_test_block(test_id: int, db: Session, api_key: str) -> CourseTestAna
     if not response or not response.text:
         raise RuntimeError("No response from Gemini")
 
-    try:
-        data = json.loads(response.text.strip())
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"Failed to parse Gemini JSON response: {e}")
+    data = _parse_gemini_json(response.text)
 
     # Create or replace the CourseTestAnalysis record
     existing = db.query(CourseTestAnalysis).filter(CourseTestAnalysis.test_id == test_id).first()
