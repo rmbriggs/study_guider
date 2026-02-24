@@ -175,7 +175,7 @@ function AttachmentRow({
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 14, wordBreak: 'break-word', overflowWrap: 'break-word' }} title={att.file_name}>
+            <div style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.file_name}>
               {att.file_name}
             </div>
             {allowMultipleBlocks && alsoInNames.length > 0 && (
