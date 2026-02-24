@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from app.config import get_settings
+from app.config import get_settings, get_upload_base
 from app.db import get_db
 from app.models.user import User
 from app.models.course import Professor, Course, CourseTest, CourseAttachment, CourseAttachmentTest, CourseAttachmentType, CourseTestAnalysis
@@ -39,9 +39,10 @@ MAX_COURSE_FILES = 10
 
 
 def _ensure_upload_dir(subdir: str = SYLLABUS_SUBDIR):
-    path = Path(settings.upload_dir) / subdir
+    """Use canonical upload base (backend-relative) so paths are stable across runs."""
+    path = get_upload_base() / subdir
     path.mkdir(parents=True, exist_ok=True)
-    return path.resolve()
+    return path
 
 
 # ---- Professors ----

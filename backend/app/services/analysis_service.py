@@ -16,6 +16,7 @@ from app.models.course import (
     CourseAttachmentType,
 )
 from app.services.file_parser import extract_text_from_file, _resolve_file_path
+from app.services.text_sanitizer import sanitize_text_for_gemini
 
 ANALYSIS_MODEL = "gemini-2.5-flash"
 _MAX_CHARS_PER_FILE = 10_000
@@ -63,7 +64,7 @@ def analyze_test_block(test_id: int, db: Session, api_key: str) -> CourseTestAna
             text = extract_text_from_file(att.file_path, att.file_type) or ""
             if len(text) > _MAX_CHARS_PER_FILE:
                 text = text[:_MAX_CHARS_PER_FILE] + "\n\n*[truncated]*"
-            out = text or _NO_TEXT
+            out = sanitize_text_for_gemini(text) or _NO_TEXT
         extracted.append((att, out))
         return out
 
@@ -96,6 +97,9 @@ def analyze_test_block(test_id: int, db: Session, api_key: str) -> CourseTestAna
             + (" | ".join(parts) if parts else "Check that files are text-based PDFs (not scanned).")
         )
 
+    # Sanitize section headers (file names) in case they contain problematic characters
+    handout_section = sanitize_text_for_gemini(handout_section)
+    test_section = sanitize_text_for_gemini(test_section)
     prompt = (
         "## Handout/Note Materials\n"
         f"{handout_section}"

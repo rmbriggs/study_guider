@@ -147,17 +147,35 @@ def extract_text_from_html(file_path: str | Path) -> str:
 
 
 def _resolve_file_path(file_path: str | Path) -> Path:
-    """Resolve to an existing file; try cwd and then backend-relative for relative paths."""
+    """Resolve to an existing file. Uses a canonical upload base so paths are found
+    regardless of where the server was started (cwd) when the path was stored."""
     path = Path(file_path)
     if path.exists():
         return path
-    if path.is_absolute():
-        return path
-    # Relative path: try current working directory, then backend root (for when server runs from project root)
-    for base in (Path.cwd(), Path(__file__).resolve().parent.parent):
-        candidate = (base / file_path).resolve()
-        if candidate.exists():
-            return candidate
+    # Try canonical upload base so DB paths from different cwds still resolve
+    try:
+        from app.config import get_upload_base
+        base = get_upload_base()
+    except Exception:
+        base = None
+    if base is not None:
+        # Relative path: try under canonical base first
+        if not path.is_absolute():
+            candidate = base / path
+            if candidate.exists():
+                return candidate
+        # Absolute path that doesn't exist: may have been stored when cwd differed.
+        # Rebuild path under canonical base using subdir + filename (e.g. course_files/xyz.pdf)
+        for subdir in ("course_files", "syllabi"):
+            candidate = base / subdir / path.name
+            if candidate.exists():
+                return candidate
+    # Fallback: try cwd and backend root for relative paths
+    if not path.is_absolute():
+        for fallback_base in (Path.cwd(), Path(__file__).resolve().parent.parent):
+            candidate = (fallback_base / file_path).resolve()
+            if candidate.exists():
+                return candidate
     return path
 
 

@@ -45,3 +45,9 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def get_upload_base() -> Path:
+    """Return the canonical upload directory (backend-relative). Use this so file paths
+    are stable regardless of current working directory when the server starts."""
+    return _BACKEND_DIR / get_settings().upload_dir

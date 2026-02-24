@@ -127,7 +127,7 @@ export default function ProfessorQuiz() {
           {!hasQuestions && (
             <>
               <p style={{ marginBottom: 16 }}>
-                Generate 5 short questions about this professor (exam style, emphasis, weak areas). Answer them here; your answers will be passed to the AI when you create a study guide.
+                Generate 5 multiple-choice questions about this professor (exam style, emphasis, weak areas). Your choices are passed to the AI when you create a study guide.
               </p>
               {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
               <Button variant="accent" onClick={handleGenerate} disabled={generating}>
@@ -141,18 +141,42 @@ export default function ProfessorQuiz() {
             <>
               <div style={{ marginBottom: 20 }}>
                 {questions.map((q) => (
-                  <div key={q.id} style={{ marginBottom: 20 }}>
-                    <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 6, color: 'var(--text-primary)' }}>
+                  <div key={q.id} style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: 'var(--text-primary)' }}>
                       {q.text}
-                    </label>
-                    <textarea
-                      className="textarea"
-                      placeholder="Your answer…"
-                      value={answers[q.id] ?? ''}
-                      onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                      rows={2}
-                      style={{ width: '100%' }}
-                    />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {(q.options && q.options.length > 0)
+                        ? q.options.map((opt) => (
+                            <label
+                              key={opt}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 10,
+                                cursor: 'pointer',
+                                padding: '10px 12px',
+                                borderRadius: 8,
+                                background: answers[q.id] === opt ? 'var(--bg-secondary)' : 'transparent',
+                                border: '1px solid var(--border-color)',
+                              }}
+                            >
+                              <input
+                                type="radio"
+                                name={q.id}
+                                value={opt}
+                                checked={answers[q.id] === opt}
+                                onChange={() => handleAnswerChange(q.id, opt)}
+                              />
+                              <span style={{ fontSize: 14 }}>{opt}</span>
+                            </label>
+                          ))
+                        : (
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                              No options — click Regenerate questions for multiple choice.
+                            </p>
+                          )}
+                    </div>
                   </div>
                 ))}
               </div>

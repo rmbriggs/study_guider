@@ -9,6 +9,8 @@ Modular design: edit MATERIAL_INSTRUCTIONS[type] or the block constants below to
 how Gemini treats any individual material type without touching the rest of the prompt.
 """
 
+from app.services.text_sanitizer import sanitize_text_for_gemini
+
 GEMINI_MODEL = "gemini-2.5-flash"
 
 # Per-source character cap before truncation (~3 k tokens each)
@@ -191,39 +193,39 @@ def build_user_prompt(
     # Context header
     header: list[str] = []
     if course:
-        header.append(f"**Course:** {course}")
+        header.append(f"**Course:** {sanitize_text_for_gemini(course)}")
     if professor_name:
-        header.append(f"**Professor:** {professor_name}")
+        header.append(f"**Professor:** {sanitize_text_for_gemini(professor_name)}")
     if header:
         parts.append("\n".join(header))
 
     if user_specs and user_specs.strip():
-        parts.append(f"\n**Student's special instructions:**\n{user_specs.strip()}")
+        parts.append(f"\n**Student's special instructions:**\n{sanitize_text_for_gemini(user_specs).strip()}")
 
     # Historical test analysis — inserted before the uploaded files
     if block_analyses:
         analysis_lines = ["\n---\n## Historical Test Analysis"]
         for ba in block_analyses:
-            summary = (ba.get("summary") or "").strip()
+            summary = sanitize_text_for_gemini((ba.get("summary") or "").strip())
             if summary:
                 analysis_lines.append(f"\n**Analysis:** {summary}")
             high_signal = ba.get("high_signal_handouts") or []
             for hs in high_signal:
-                fname = hs.get("file_name", "")
-                coverage = hs.get("topic_coverage", "")
+                fname = sanitize_text_for_gemini(hs.get("file_name", ""))
+                coverage = sanitize_text_for_gemini(hs.get("topic_coverage", ""))
                 qcount = hs.get("question_count", 0)
                 analysis_lines.append(f"- **{fname}**: {coverage} ({qcount} question(s) from this source)")
             topic_freq = ba.get("topic_frequency") or {}
-            zero_topics = [t for t, c in topic_freq.items() if not c]
+            zero_topics = [sanitize_text_for_gemini(t) for t, c in topic_freq.items() if not c]
             for zt in zero_topics:
                 analysis_lines.append(f"  ⚠ Not yet tested — treat as lower priority: {zt}")
         parts.append("\n".join(analysis_lines))
 
-    # Group sources by material type
+    # Group sources by material type; sanitize so Gemini receives safe text
     grouped: dict[str, list[tuple[str, str]]] = {}
     for mtype, label, text in typed_sources:
         if text and text.strip():
-            grouped.setdefault(mtype, []).append((label, text))
+            grouped.setdefault(mtype, []).append((sanitize_text_for_gemini(label), sanitize_text_for_gemini(text)))
 
     if not grouped:
         return "\n".join(parts) if parts else ""
@@ -298,8 +300,8 @@ def generate_professor_quiz_questions(
     api_key: str,
 ) -> list[dict]:
     """
-    Call Gemini to generate exactly 5 short questions that help tailor a study guide
-    for this professor. Returns list of {"id": "q1", "text": "..."} with ids q1..q5.
+    Call Gemini to generate exactly 5 multiple-choice questions that help tailor a study guide
+    for this professor. Returns list of {"id": "q1", "text": "...", "options": ["A", "B", "C", "D"]}.
     """
     try:
         import json
@@ -314,22 +316,24 @@ def generate_professor_quiz_questions(
         raise ValueError("GEMINI_API_KEY is not set")
 
     system = (
-        "You are a helpful assistant that creates short survey questions for students "
+        "You are a helpful assistant that creates multiple-choice survey questions for students "
         "about their professor. Your output will be parsed as JSON. "
         "Respond with ONLY a valid JSON array of exactly 5 objects. "
-        "Each object must have exactly two keys: \"id\" (string: \"q1\", \"q2\", \"q3\", \"q4\", \"q5\") "
-        "and \"text\" (string: the question, one short sentence). "
+        "Each object must have exactly three keys: "
+        "\"id\" (string: \"q1\", \"q2\", \"q3\", \"q4\", \"q5\"), "
+        "\"text\" (string: the question, one short sentence), and "
+        "\"options\" (array of exactly 4 strings: the multiple-choice options, e.g. [\"Mostly short answer\", \"Mix of MC and short answer\", \"Mostly multiple choice\", \"Essays and long form\"]). "
         "No markdown, no code fences, no explanation — only the JSON array."
     )
-    parts = [f"Professor name: {professor_name or 'Unknown'}."]
+    parts = [f"Professor name: {sanitize_text_for_gemini(professor_name or 'Unknown')}."]
     if specialties and specialties.strip():
-        parts.append(f"Their specialties: {specialties.strip()}.")
+        parts.append(f"Their specialties: {sanitize_text_for_gemini(specialties).strip()}.")
     if description and description.strip():
-        parts.append(f"Additional context: {description.strip()}")
+        parts.append(f"Additional context: {sanitize_text_for_gemini(description).strip()}")
     parts.append(
-        "Generate exactly 5 questions that help tailor a study guide for this professor. "
-        "Focus on: exam style, what they emphasize, question formats they use, topics they care about, "
-        "or weak areas the student wants to focus on. Keep each question concise and useful for study guide generation."
+        "Generate exactly 5 multiple-choice questions that help tailor a study guide for this professor. "
+        "Focus on: exam style, what they emphasize, question formats, topics they care about, or weak areas. "
+        "Each question must have exactly 4 short, distinct options. Keep questions and options concise."
     )
     user_content = " ".join(parts)
 
@@ -344,28 +348,36 @@ def generate_professor_quiz_questions(
         raise ValueError("No response generated for quiz questions")
 
     raw = response.text.strip()
-    # Strip markdown code fence if present
     if "```" in raw:
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
         raw = re.sub(r"\s*```\s*$", "", raw)
     data = json.loads(raw)
     if not isinstance(data, list):
         data = [data]
-    # Normalize to q1..q5 with id and text
     result = []
     for i, item in enumerate(data[:5]):
         if isinstance(item, dict):
             qid = item.get("id") or f"q{i + 1}"
+            if not str(qid).startswith("q"):
+                qid = f"q{i + 1}"
             text = item.get("text") or str(item.get("question", "")) or f"Question {i + 1}"
+            opts = item.get("options")
+            if not isinstance(opts, list) or len(opts) < 2:
+                opts = ["Option A", "Option B", "Option C", "Option D"][: max(2, len(opts) if isinstance(opts, list) else 4)]
+            options = [str(o).strip()[:200] for o in opts if o][:4]
+            while len(options) < 2:
+                options.append(f"Option {len(options) + 1}")
         else:
             qid = f"q{i + 1}"
-            text = str(item) if item else f"Question {i + 1}"
-        if not qid.startswith("q"):
-            qid = f"q{i + 1}"
-        result.append({"id": qid, "text": text[:500]})
-    # Ensure exactly 5 with ids q1..q5
+            text = f"Question {i + 1}."
+            options = ["Option A", "Option B", "Option C", "Option D"]
+        result.append({"id": qid, "text": text[:500], "options": options})
     while len(result) < 5:
-        result.append({"id": f"q{len(result) + 1}", "text": f"Question {len(result) + 1}."})
+        result.append({
+            "id": f"q{len(result) + 1}",
+            "text": f"Question {len(result) + 1}.",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+        })
     return result[:5]
 
 
