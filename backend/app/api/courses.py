@@ -1,7 +1,10 @@
+import logging
 import re
 import shutil
 import uuid
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
@@ -351,6 +354,7 @@ def analyze_test(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
+        logger.exception("Analyze block failed for test_id=%s: %s", test_id, e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
     return analysis
 
