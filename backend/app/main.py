@@ -33,15 +33,19 @@ def _ensure_allow_multiple_blocks_column():
 
 
 def _ensure_analysis_columns():
-    """Add professors.analysis_profile if missing (added with analysis feature)."""
+    """Add professors.analysis_profile and professors.study_guide_quiz if missing."""
     try:
         with engine.connect() as conn:
             inspector = inspect(engine)
-            if "professors" in inspector.get_table_names():
-                columns = [c["name"] for c in inspector.get_columns("professors")]
-                if "analysis_profile" not in columns:
-                    conn.execute(text("ALTER TABLE professors ADD COLUMN analysis_profile JSON"))
-                    conn.commit()
+            if "professors" not in inspector.get_table_names():
+                return
+            columns = [c["name"] for c in inspector.get_columns("professors")]
+            if "analysis_profile" not in columns:
+                conn.execute(text("ALTER TABLE professors ADD COLUMN analysis_profile JSON"))
+                conn.commit()
+            if "study_guide_quiz" not in columns:
+                conn.execute(text("ALTER TABLE professors ADD COLUMN study_guide_quiz JSON"))
+                conn.commit()
     except Exception:
         pass
 
