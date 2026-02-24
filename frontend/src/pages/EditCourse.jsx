@@ -57,9 +57,14 @@ function AttachmentRow({
   onDuplicate,
   onDeleteAttachment,
   onReload,
+  sectionTitle,
 }) {
   const Icon = ATTACHMENT_KIND_ICON[att.attachment_kind] || FileText
   const label = ATTACHMENT_KIND_LABEL[att.attachment_kind] || att.attachment_kind
+  const isRedundantLabel =
+    (sectionTitle === 'Past tests' && att.attachment_kind === 'past_test') ||
+    (sectionTitle === 'Handouts' && att.attachment_kind === 'handout') ||
+    (sectionTitle === 'Notes' && att.attachment_kind === 'note')
   const allowMultipleBlocks = !!att.allow_multiple_blocks
   const isPastTest = att.attachment_kind === 'past_test'
   const [deleting, setDeleting] = useState(false)
@@ -108,6 +113,7 @@ function AttachmentRow({
         gap: 10,
         padding: '8px 0',
         borderBottom: '1px solid var(--bg-tertiary)',
+        minWidth: 0,
         ...dndStyle,
       }}
     >
@@ -139,7 +145,7 @@ function AttachmentRow({
       >
         <Icon size={15} />
       </span>
-      <div style={{ flex: 1, minWidth: 80, overflow: 'hidden' }}>
+      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
         {editingName ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <input
@@ -191,7 +197,9 @@ function AttachmentRow({
           </>
         )}
       </div>
-      <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
+      {!isRedundantLabel && (
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
+      )}
       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
         <button
           type="button"
@@ -359,6 +367,7 @@ function KindSection({
               onDuplicate={onDuplicate}
               onDeleteAttachment={onDeleteAttachment}
               onReload={onReload}
+              sectionTitle={title}
             />
           ))}
         </ul>
@@ -454,6 +463,7 @@ function TestBlockCard({
       style={{
         outline: isOver ? '2px solid var(--blue-bold)' : 'none',
         outlineOffset: 2,
+        overflow: 'hidden',
       }}
     >
       <div
