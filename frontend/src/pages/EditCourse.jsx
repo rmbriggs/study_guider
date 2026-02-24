@@ -61,6 +61,7 @@ function AttachmentRow({
   const Icon = ATTACHMENT_KIND_ICON[att.attachment_kind] || FileText
   const label = ATTACHMENT_KIND_LABEL[att.attachment_kind] || att.attachment_kind
   const allowMultipleBlocks = !!att.allow_multiple_blocks
+  const isPastTest = att.attachment_kind === 'past_test'
   const [deleting, setDeleting] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [editingName, setEditingName] = useState(false)
@@ -80,7 +81,7 @@ function AttachmentRow({
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: draggableId,
     data: { attachment: att, fromTestId },
-    disabled: !!moveLoading,
+    disabled: !!moveLoading || isPastTest,
   })
   const dndStyle = {
     transform: CSS.Translate.toString(transform),
@@ -110,24 +111,28 @@ function AttachmentRow({
         ...dndStyle,
       }}
     >
-      <span
-        {...attributes}
-        {...listeners}
-        style={{
-          width: 20,
-          height: 20,
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--text-muted)',
-          cursor: moveLoading ? 'not-allowed' : 'grab',
-          flexShrink: 0,
-          userSelect: 'none',
-        }}
-        title="Drag"
-      >
-        <GripVertical size={16} />
-      </span>
+      {isPastTest ? (
+        <span style={{ width: 20, flexShrink: 0 }} />
+      ) : (
+        <span
+          {...attributes}
+          {...listeners}
+          style={{
+            width: 20,
+            height: 20,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--text-muted)',
+            cursor: moveLoading ? 'not-allowed' : 'grab',
+            flexShrink: 0,
+            userSelect: 'none',
+          }}
+          title="Drag"
+        >
+          <GripVertical size={16} />
+        </span>
+      )}
       <span
         className="icon-badge ib-blue"
         style={{ width: 30, height: 30, marginBottom: 0, flexShrink: 0 }}
@@ -272,36 +277,40 @@ function AttachmentRow({
                 {duplicating ? 'Duplicating…' : 'Duplicate'}
               </button>
             )}
-            <div style={{ padding: '6px 10px', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>
-              Assign to
-            </div>
-            {allowMultipleBlocks && fromTestId != null && testIds.includes(fromTestId) && (
-              <button
-                type="button"
-                className="select-option"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false)
-                  onRemoveFromBlock(att, fromTestId)
-                }}
-              >
-                Remove from this block
-              </button>
+            {!isPastTest && (
+              <>
+                <div style={{ padding: '6px 10px', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>
+                  Assign to
+                </div>
+                {allowMultipleBlocks && fromTestId != null && testIds.includes(fromTestId) && (
+                  <button
+                    type="button"
+                    className="select-option"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      onRemoveFromBlock(att, fromTestId)
+                    }}
+                  >
+                    Remove from this block
+                  </button>
+                )}
+                {moveOptions.map((s) => (
+                  <button
+                    key={s.id ?? 'uncat'}
+                    type="button"
+                    className="select-option"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      onAssign(att, s.id ?? null)
+                    }}
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </>
             )}
-            {moveOptions.map((s) => (
-              <button
-                key={s.id ?? 'uncat'}
-                type="button"
-                className="select-option"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false)
-                  onAssign(att, s.id ?? null)
-                }}
-              >
-                {s.name}
-              </button>
-            ))}
           </div>
         )}
       </div>
