@@ -25,3 +25,9 @@ export async function createGuideFromBlock(body) {
   const { data } = await api.post('/guides/from-block', body)
   return data
 }
+
+/** Update a study guide (e.g. rename title). */
+export async function updateGuide(id, body) {
+  const { data } = await api.patch(`/guides/${id}`, body)
+  return data
+}

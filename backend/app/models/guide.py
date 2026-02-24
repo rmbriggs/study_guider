@@ -22,6 +22,8 @@ class StudyGuide(Base):
     user_specs = Column(Text, nullable=True)
     status = Column(String(32), nullable=False, default=GuideStatus.processing.value)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
+    test_id = Column(Integer, ForeignKey("course_tests.id"), nullable=True)
 
     user = relationship("User", backref="study_guides")
     sources = relationship("GuideSource", back_populates="guide", cascade="all, delete-orphan")

@@ -108,9 +108,16 @@ class CourseAttachmentResponse(BaseModel):
         from_attributes = True
 
 
+class BlockGuideInfo(BaseModel):
+    id: int
+    title: str
+    status: str
+
+
 class CourseMaterialsResponse(BaseModel):
     tests: list[CourseTestResponse]
     attachments: list[CourseAttachmentResponse]
+    guides_by_test: dict[str, BlockGuideInfo] = {}
 
 
 class AttachmentUpdate(BaseModel):

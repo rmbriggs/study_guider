@@ -11,6 +11,7 @@ from app.schemas.guides import (
     StudyGuideListItem,
     CreateGuideResponse,
     CreateGuideFromBlockRequest,
+    GuideUpdate,
     GuideOutputResponse,
     GuideSourceResponse,
     GuideOptionsResponse,
@@ -158,6 +159,8 @@ def create_guide_from_block(
         professor_name=professor_name,
         user_specs=None,
         status=GuideStatus.processing.value,
+        course_id=body.course_id,
+        test_id=body.test_id,
     )
     db.add(guide)
     db.commit()
@@ -329,6 +332,44 @@ def get_guide(
     guide = db.query(StudyGuide).filter(StudyGuide.id == guide_id, StudyGuide.user_id == current_user.id).first()
     if not guide:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide not found")
+    out = None
+    if guide.output:
+        out = GuideOutputResponse(
+            id=guide.output.id,
+            content=guide.output.content,
+            model_used=guide.output.model_used,
+            created_at=guide.output.created_at,
+        )
+    return StudyGuideResponse(
+        id=guide.id,
+        user_id=guide.user_id,
+        title=guide.title,
+        course=getattr(guide, "course", "") or "",
+        professor_name=guide.professor_name,
+        user_specs=guide.user_specs,
+        status=guide.status,
+        created_at=guide.created_at,
+        output=out,
+        sources=[GuideSourceResponse(id=s.id, file_name=s.file_name, file_type=s.file_type) for s in guide.sources],
+    )
+
+
+@router.patch("/{guide_id}", response_model=StudyGuideResponse)
+def update_guide(
+    guide_id: int,
+    body: GuideUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    guide = db.query(StudyGuide).filter(StudyGuide.id == guide_id, StudyGuide.user_id == current_user.id).first()
+    if not guide:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide not found")
+    if body.title is not None:
+        title = (body.title or "").strip()
+        if title:
+            guide.title = title
+    db.commit()
+    db.refresh(guide)
     out = None
     if guide.output:
         out = GuideOutputResponse(

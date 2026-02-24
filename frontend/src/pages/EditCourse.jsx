@@ -394,6 +394,7 @@ function TestBlockCard({
   isAnalyzing,
   onAnalyze,
   onGenerateGuide,
+  blockGuide,
 }) {
   const [moveLoading, setMoveLoading] = useState(null)
   const [generatingGuide, setGeneratingGuide] = useState(false)
@@ -594,7 +595,22 @@ function TestBlockCard({
           </div>
         )
       })()}
-      {pastTests.length === 0 && (handouts.length > 0 || notes.length > 0) && onGenerateGuide && (
+      {blockGuide ? (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--bg-tertiary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <BookOpen size={18} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+            <Link
+              to={`/guide/${blockGuide.id}`}
+              style={{ fontSize: 14, fontWeight: 600, color: 'var(--blue-bold)', textDecoration: 'none' }}
+            >
+              {blockGuide.title}
+            </Link>
+            <span className={`chip ${blockGuide.status === 'completed' ? 'chip-green' : 'chip-outlined'}`} style={{ fontSize: 12 }}>
+              {blockGuide.status}
+            </span>
+          </div>
+        </div>
+      ) : pastTests.length === 0 && (handouts.length > 0 || notes.length > 0) && onGenerateGuide ? (
         <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--bg-tertiary)' }}>
           <Button
             variant="accent"
@@ -612,7 +628,7 @@ function TestBlockCard({
             {generatingGuide ? 'Generating…' : 'Generate study guide'}
           </Button>
         </div>
-      )}
+      ) : null}
     </>
   )
 
@@ -896,6 +912,7 @@ export default function EditCourse() {
     setAnalyzeError('')
     try {
       const data = await createGuideFromBlock({ course_id: courseId, test_id: testId })
+      loadMaterials()
       navigate(`/guide/${data.id}`)
     } catch (err) {
       setAnalyzeError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to generate study guide'))
@@ -1294,6 +1311,7 @@ export default function EditCourse() {
                   isAnalyzing={analyzingTestIds.has(test.id)}
                   onAnalyze={handleAnalyze}
                   onGenerateGuide={handleGenerateGuide}
+                  blockGuide={materials.guides_by_test?.[String(test.id)]}
                 />
               ))}
             </div>
@@ -1309,6 +1327,7 @@ export default function EditCourse() {
               onDeleteAttachment={handleDeleteAttachment}
               isUncategorized
               onGenerateGuide={handleGenerateGuide}
+              blockGuide={materials.guides_by_test?.['null']}
             />
           </DndContext>
         )}

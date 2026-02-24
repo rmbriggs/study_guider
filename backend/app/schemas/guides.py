@@ -68,3 +68,7 @@ class CreateGuideFromBlockRequest(BaseModel):
     course_id: int
     test_id: int | None = None  # None = uncategorized block
     title: str | None = None
+
+
+class GuideUpdate(BaseModel):
+    title: str | None = None

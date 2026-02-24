@@ -50,6 +50,28 @@ def _ensure_analysis_columns():
         pass
 
 
+def _ensure_guide_block_columns():
+    """Add study_guides.course_id and study_guides.test_id if missing (block–guide link)."""
+    try:
+        with engine.connect() as conn:
+            inspector = inspect(engine)
+            if "study_guides" not in inspector.get_table_names():
+                return
+            columns = [c["name"] for c in inspector.get_columns("study_guides")]
+            if "course_id" not in columns:
+                conn.execute(text(
+                    "ALTER TABLE study_guides ADD COLUMN course_id INTEGER REFERENCES courses(id)"
+                ))
+                conn.commit()
+            if "test_id" not in columns:
+                conn.execute(text(
+                    "ALTER TABLE study_guides ADD COLUMN test_id INTEGER REFERENCES course_tests(id)"
+                ))
+                conn.commit()
+    except Exception:
+        pass
+
+
 def _sync_admin_users():
     """Set is_admin=True for user IDs listed in ADMIN_USER_IDS (comma-separated)."""
     ids_str = (settings.admin_user_ids or "").strip()
@@ -79,6 +101,7 @@ app = FastAPI(title="CourseMind API", version="1.0.0")
 def on_startup():
     _ensure_allow_multiple_blocks_column()
     _ensure_analysis_columns()
+    _ensure_guide_block_columns()
     _sync_admin_users()
 app.add_middleware(
     CORSMiddleware,

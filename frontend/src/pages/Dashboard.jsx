@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Mail } from 'lucide-react'
+import { BookOpen, Mail, Pencil } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { getMyGuides } from '../api/guides'
+import { getMyGuides, updateGuide } from '../api/guides'
 import Button from '../components/Button'
 
 export default function Dashboard() {
@@ -10,6 +10,9 @@ export default function Dashboard() {
   const [guides, setGuides] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [renamingId, setRenamingId] = useState(null)
+  const [editTitleValue, setEditTitleValue] = useState('')
+  const [savingTitle, setSavingTitle] = useState(false)
 
   useEffect(() => {
     setError('')
@@ -32,6 +35,36 @@ export default function Dashboard() {
     } catch {
       return ''
     }
+  }
+
+  const handleStartRename = (g, e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setEditTitleValue(g.title)
+    setRenamingId(g.id)
+  }
+
+  const handleSaveRename = async () => {
+    const title = (editTitleValue || '').trim()
+    if (!renamingId || !title) {
+      setRenamingId(null)
+      return
+    }
+    setSavingTitle(true)
+    try {
+      await updateGuide(renamingId, { title })
+      setGuides((prev) => prev.map((g) => (g.id === renamingId ? { ...g, title } : g)))
+      setRenamingId(null)
+    } catch (_) {}
+    finally {
+      setSavingTitle(false)
+    }
+  }
+
+  const handleCancelRename = (e) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+    setRenamingId(null)
   }
 
   return (
@@ -74,23 +107,59 @@ export default function Dashboard() {
         <div className="animate-in delay-3">
           <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
             {guides.map((g) => (
-              <Link key={g.id} to={`/guide/${g.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <div className="card" style={{ cursor: 'pointer', height: '100%' }}>
-                  <div className="icon-badge ib-blue">
-                    <BookOpen size={20} />
+              <div key={g.id}>
+                {renamingId === g.id ? (
+                  <div className="card" style={{ height: '100%' }}>
+                    <div className="icon-badge ib-blue">
+                      <BookOpen size={20} />
+                    </div>
+                    <input
+                      type="text"
+                      className="input"
+                      value={editTitleValue}
+                      onChange={(e) => setEditTitleValue(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveRename()}
+                      style={{ marginBottom: 8, fontSize: 18, fontWeight: 600 }}
+                      autoFocus
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Button variant="accent" onClick={handleSaveRename} disabled={savingTitle}>
+                        {savingTitle ? 'Saving…' : 'Save'}
+                      </Button>
+                      <Button variant="ghost" onClick={handleCancelRename}>Cancel</Button>
+                    </div>
                   </div>
-                  <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>{g.title}</div>
-                  <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                    {[g.course, g.professor_name].filter(Boolean).join(' · ') || 'No course or professor'}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className={`chip ${g.status === 'completed' ? 'chip-green' : 'chip-outlined'}`}>
-                      {g.status}
-                    </span>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatDate(g.created_at)}</span>
-                  </div>
-                </div>
-              </Link>
+                ) : (
+                  <Link to={`/guide/${g.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                    <div className="card" style={{ cursor: 'pointer', height: '100%' }}>
+                      <div className="icon-badge ib-blue">
+                        <BookOpen size={20} />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <div style={{ fontSize: 18, fontWeight: 600, flex: 1, minWidth: 0 }}>{g.title}</div>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ padding: 4, flexShrink: 0 }}
+                          onClick={(e) => handleStartRename(g, e)}
+                          aria-label="Rename guide"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      </div>
+                      <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                        {[g.course, g.professor_name].filter(Boolean).join(' · ') || 'No course or professor'}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className={`chip ${g.status === 'completed' ? 'chip-green' : 'chip-outlined'}`}>
+                          {g.status}
+                        </span>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatDate(g.created_at)}</span>
+                      </div>
+                    </div>
+                  </Link>
+                )}
+              </div>
             ))}
           </div>
         </div>

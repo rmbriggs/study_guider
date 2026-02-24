@@ -7,11 +7,13 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.responses import FileResponse, Response
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.config import get_settings, get_upload_base
 from app.db import get_db
 from app.models.user import User
 from app.models.course import Professor, Course, CourseTest, CourseAttachment, CourseAttachmentTest, CourseAttachmentType, CourseTestAnalysis
+from app.models.guide import StudyGuide
 from app.schemas.courses import (
     ProfessorResponse,
     ProfessorCreate,
@@ -26,6 +28,7 @@ from app.schemas.courses import (
     CourseTestUpdate,
     CourseAttachmentResponse,
     CourseMaterialsResponse,
+    BlockGuideInfo,
     AttachmentUpdate,
     CourseTestAnalysisResponse,
 )
@@ -262,9 +265,32 @@ def get_course_materials(
             analysis_summary=analysis.summary if analysis else None,
         ))
 
+    # Guides linked to this course's blocks (course_id + test_id); key "null" = uncategorized
+    guides_by_test: dict[str, BlockGuideInfo] = {}
+    block_guides = (
+        db.query(StudyGuide)
+        .filter(
+            StudyGuide.user_id == current_user.id,
+            StudyGuide.course_id == course_id,
+            or_(StudyGuide.test_id.in_(test_ids), StudyGuide.test_id.is_(None)),
+        )
+        .order_by(StudyGuide.created_at.desc())
+        .all()
+    )
+    # One guide per block: keep most recent per test_id
+    seen: set[int | None] = set()
+    for g in block_guides:
+        tid = g.test_id
+        if tid in seen:
+            continue
+        seen.add(tid)
+        key = "null" if tid is None else str(tid)
+        guides_by_test[key] = BlockGuideInfo(id=g.id, title=g.title or "Untitled Guide", status=g.status or "")
+
     return CourseMaterialsResponse(
         tests=test_responses,
         attachments=attachment_models,
+        guides_by_test=guides_by_test,
     )
 
 
