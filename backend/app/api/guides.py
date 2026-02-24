@@ -6,7 +6,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.models.user import User
 from app.models.guide import StudyGuide, GuideSource, StudyGuideOutput, GuideStatus
-from app.models.course import Course, Professor, CourseAttachment
+from app.models.course import Course, Professor, CourseAttachment, CourseTest, CourseAttachmentTest, CourseTestAnalysis, CourseAttachmentType
 from app.schemas.guides import (
     StudyGuideResponse,
     StudyGuideListItem,
@@ -212,13 +212,67 @@ async def create_guide(
             typed_sources.append((material_type, f.filename, text or "(no text extracted)"))
 
         api_key = settings.gemini_api_key
+
+        # Collect test-handout analyses for this course (auto-analyzing missing ones)
+        block_analyses: list[dict] = []
+        professor_analysis: dict | None = None
+        guide_course_str = getattr(guide, "course", "") or ""
+        if guide_course_str:
+            course_obj = db.query(Course).filter(
+                Course.user_id == current_user.id,
+                Course.nickname == guide_course_str,
+            ).first()
+            if course_obj:
+                from app.services.analysis_service import analyze_test_block
+                tests = db.query(CourseTest).filter(CourseTest.course_id == course_obj.id).all()
+                for test in tests:
+                    link_rows = db.query(CourseAttachmentTest).filter(
+                        CourseAttachmentTest.test_id == test.id
+                    ).all()
+                    att_ids = [r.attachment_id for r in link_rows]
+                    if not att_ids:
+                        continue
+                    atts = db.query(CourseAttachment).filter(
+                        CourseAttachment.id.in_(att_ids)
+                    ).all()
+                    has_past_test = any(a.attachment_kind == CourseAttachmentType.PAST_TEST for a in atts)
+                    has_handout = any(
+                        a.attachment_kind in (CourseAttachmentType.HANDOUT, CourseAttachmentType.NOTE)
+                        for a in atts
+                    )
+                    if not (has_past_test and has_handout):
+                        continue
+                    existing = db.query(CourseTestAnalysis).filter(
+                        CourseTestAnalysis.test_id == test.id
+                    ).first()
+                    if not existing:
+                        try:
+                            existing = analyze_test_block(test.id, db, api_key)
+                        except Exception:
+                            pass
+                    if existing:
+                        block_analyses.append({
+                            "summary": existing.summary,
+                            "high_signal_handouts": existing.high_signal_handouts,
+                            "topic_frequency": existing.topic_frequency,
+                            "question_formats": existing.question_formats,
+                        })
+                if course_obj.professor_id:
+                    prof_obj = db.query(Professor).filter(
+                        Professor.id == course_obj.professor_id
+                    ).first()
+                    if prof_obj and prof_obj.analysis_profile:
+                        professor_analysis = prof_obj.analysis_profile
+
         content, model_used = generate_study_guide(
-            course=getattr(guide, "course", "") or "",
+            course=guide_course_str,
             professor_name=guide.professor_name,
             user_specs=guide.user_specs,
             typed_sources=typed_sources,
             professor_profile=professor_profile,
             api_key=api_key,
+            block_analyses=block_analyses or None,
+            professor_analysis=professor_analysis,
         )
         output = StudyGuideOutput(
             guide_id=guide.id,

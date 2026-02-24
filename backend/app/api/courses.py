@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.models.user import User
-from app.models.course import Professor, Course, CourseTest, CourseAttachment, CourseAttachmentTest, CourseAttachmentType
+from app.models.course import Professor, Course, CourseTest, CourseAttachment, CourseAttachmentTest, CourseAttachmentType, CourseTestAnalysis
 from app.schemas.courses import (
     ProfessorResponse,
     ProfessorCreate,
@@ -22,6 +22,7 @@ from app.schemas.courses import (
     CourseAttachmentResponse,
     CourseMaterialsResponse,
     AttachmentUpdate,
+    CourseTestAnalysisResponse,
 )
 from app.api.deps import get_current_user
 
@@ -156,8 +157,28 @@ def get_course_materials(
         base["allow_multiple_blocks"] = getattr(a, "allow_multiple_blocks", False)
         attachment_models.append(CourseAttachmentResponse(**base))
 
+    # Fetch analyses for all test IDs in one query
+    test_ids = [t.id for t in tests]
+    analyses_by_test_id: dict[int, CourseTestAnalysis] = {}
+    if test_ids:
+        analyses = db.query(CourseTestAnalysis).filter(CourseTestAnalysis.test_id.in_(test_ids)).all()
+        for a in analyses:
+            analyses_by_test_id[a.test_id] = a
+
+    test_responses: list[CourseTestResponse] = []
+    for t in tests:
+        analysis = analyses_by_test_id.get(t.id)
+        test_responses.append(CourseTestResponse(
+            id=t.id,
+            course_id=t.course_id,
+            name=t.name,
+            sort_order=t.sort_order,
+            is_analyzed=analysis is not None,
+            analysis_summary=analysis.summary if analysis else None,
+        ))
+
     return CourseMaterialsResponse(
-        tests=[CourseTestResponse.model_validate(t) for t in tests],
+        tests=test_responses,
         attachments=attachment_models,
     )
 
@@ -226,6 +247,50 @@ def delete_test(
     db.query(CourseAttachmentTest).filter(CourseAttachmentTest.test_id == test_id).delete(synchronize_session=False)
     db.delete(test)
     db.commit()
+
+
+@router.post("/{course_id}/tests/{test_id}/analyze", response_model=CourseTestAnalysisResponse)
+def analyze_test(
+    course_id: int,
+    test_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_course_or_404(course_id, current_user.id, db)
+    test = db.query(CourseTest).filter(
+        CourseTest.id == test_id,
+        CourseTest.course_id == course_id,
+    ).first()
+    if not test:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test section not found")
+    from app.services.analysis_service import analyze_test_block
+    try:
+        analysis = analyze_test_block(test_id, db, settings.gemini_api_key)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    return analysis
+
+
+@router.get("/{course_id}/tests/{test_id}/analysis", response_model=CourseTestAnalysisResponse)
+def get_test_analysis(
+    course_id: int,
+    test_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _get_course_or_404(course_id, current_user.id, db)
+    test = db.query(CourseTest).filter(
+        CourseTest.id == test_id,
+        CourseTest.course_id == course_id,
+    ).first()
+    if not test:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test section not found")
+    analysis = db.query(CourseTestAnalysis).filter(CourseTestAnalysis.test_id == test_id).first()
+    if not analysis:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No analysis found for this test block")
+    return analysis
 
 
 @router.patch("/{course_id}/attachments/{attachment_id}", response_model=CourseAttachmentResponse)

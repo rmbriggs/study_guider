@@ -113,7 +113,10 @@ Fix any failures before producing the output.
 # Public API
 # ---------------------------------------------------------------------------
 
-def build_system_instruction(professor_profile: dict | None) -> str:
+def build_system_instruction(
+    professor_profile: dict | None,
+    professor_analysis: dict | None = None,
+) -> str:
     """
     Build the system instruction.
     The professor profile belongs here (not in the user turn) so it acts as
@@ -141,6 +144,23 @@ def build_system_instruction(professor_profile: dict | None) -> str:
         )
         base += prof_block
 
+    if professor_analysis:
+        tested_topics = professor_analysis.get("tested_topics") or []
+        preferred_formats = professor_analysis.get("preferred_formats") or {}
+        pairs_analyzed = professor_analysis.get("test_pairs_analyzed") or 0
+        if tested_topics or preferred_formats:
+            analysis_block = "## Professor's Historical Exam Patterns\n"
+            if tested_topics:
+                topic_list = ", ".join(t["topic"] for t in tested_topics[:10])
+                analysis_block += f"Topics this professor consistently tests (ordered by frequency): {topic_list}\n"
+            if preferred_formats:
+                fmt_parts = [f"{fmt}: {n}" for fmt, n in preferred_formats.items() if n > 0]
+                if fmt_parts:
+                    analysis_block += f"Preferred question formats: {', '.join(fmt_parts)}\n"
+            if pairs_analyzed:
+                analysis_block += f"Based on {pairs_analyzed} analyzed test-handout pair(s).\n"
+            base += analysis_block + "\n"
+
     return base + _WEIGHTING_BLOCK + "\n" + _OUTPUT_FORMAT_BLOCK + "\n" + _REFLECTION_BLOCK
 
 
@@ -149,6 +169,7 @@ def build_user_prompt(
     professor_name: str,
     user_specs: str | None,
     typed_sources: list[tuple[str, str, str]],  # (material_type, label, text)
+    block_analyses: list | None = None,
 ) -> str:
     """
     Build the user-turn prompt.
@@ -168,6 +189,25 @@ def build_user_prompt(
 
     if user_specs and user_specs.strip():
         parts.append(f"\n**Student's special instructions:**\n{user_specs.strip()}")
+
+    # Historical test analysis — inserted before the uploaded files
+    if block_analyses:
+        analysis_lines = ["\n---\n## Historical Test Analysis"]
+        for ba in block_analyses:
+            summary = (ba.get("summary") or "").strip()
+            if summary:
+                analysis_lines.append(f"\n**Analysis:** {summary}")
+            high_signal = ba.get("high_signal_handouts") or []
+            for hs in high_signal:
+                fname = hs.get("file_name", "")
+                coverage = hs.get("topic_coverage", "")
+                qcount = hs.get("question_count", 0)
+                analysis_lines.append(f"- **{fname}**: {coverage} ({qcount} question(s) from this source)")
+            topic_freq = ba.get("topic_frequency") or {}
+            zero_topics = [t for t, c in topic_freq.items() if not c]
+            for zt in zero_topics:
+                analysis_lines.append(f"  ⚠ Not yet tested — treat as lower priority: {zt}")
+        parts.append("\n".join(analysis_lines))
 
     # Group sources by material type
     grouped: dict[str, list[tuple[str, str]]] = {}
@@ -205,6 +245,8 @@ def generate_study_guide(
     typed_sources: list[tuple[str, str, str]],  # (material_type, label, text)
     professor_profile: dict | None,
     api_key: str,
+    block_analyses: list | None = None,
+    professor_analysis: dict | None = None,
 ) -> tuple[str, str]:
     """
     Call Gemini to generate a study guide.
@@ -217,8 +259,8 @@ def generate_study_guide(
     if not api_key:
         raise ValueError("GEMINI_API_KEY is not set")
 
-    system_instruction = build_system_instruction(professor_profile)
-    user_content = build_user_prompt(course, professor_name, user_specs, typed_sources)
+    system_instruction = build_system_instruction(professor_profile, professor_analysis)
+    user_content = build_user_prompt(course, professor_name, user_specs, typed_sources, block_analyses)
 
     if not user_content.strip():
         return (

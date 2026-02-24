@@ -18,6 +18,7 @@ import {
   deleteAttachment,
   deleteSyllabus,
   duplicateAttachment,
+  analyzeTest,
 } from '../api/courses'
 import { getApiErrorMessage } from '../utils/apiError'
 import Button from '../components/Button'
@@ -373,6 +374,10 @@ function TestBlockCard({
   onDelete,
   onDeleteAttachment,
   isUncategorized,
+  isAnalyzed,
+  analysisSummary,
+  isAnalyzing,
+  onAnalyze,
 }) {
   const [moveLoading, setMoveLoading] = useState(null)
   const [editingName, setEditingName] = useState(false)
@@ -563,6 +568,28 @@ function TestBlockCard({
         onDeleteAttachment={onDeleteAttachment}
         onReload={onReload}
       />
+      {!isUncategorized && (() => {
+        const canAnalyze = pastTests.length > 0 && (handouts.length > 0 || notes.length > 0)
+        if (!canAnalyze && !isAnalyzed) return null
+        return (
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--bg-tertiary)' }}>
+            {isAnalyzed ? (
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--green-bold)' }}>Analyzed ✓</span>
+                {analysisSummary && (
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4, marginBottom: 0 }}>
+                    {analysisSummary}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <Button variant="secondary" onClick={() => onAnalyze(testId)} disabled={isAnalyzing}>
+                {isAnalyzing ? 'Analyzing…' : 'Analyze block'}
+              </Button>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -592,6 +619,8 @@ export default function EditCourse() {
   const [addFilesNotes, setAddFilesNotes] = useState([])
   const [filesAddedMessage, setFilesAddedMessage] = useState('')
   const [deletingId, setDeletingId] = useState(null)
+  const [analyzingTestIds, setAnalyzingTestIds] = useState(new Set())
+  const [analyzeError, setAnalyzeError] = useState('')
   const [renamingFileId, setRenamingFileId] = useState(null)
   const [renamingFileValue, setRenamingFileValue] = useState('')
   const [filesMenuOpenId, setFilesMenuOpenId] = useState(null)
@@ -799,6 +828,23 @@ export default function EditCourse() {
   }
 
   const handleDeleteAttachment = (attachmentId) => deleteAttachment(courseId, attachmentId)
+
+  const handleAnalyze = async (testId) => {
+    setAnalyzeError('')
+    setAnalyzingTestIds((prev) => new Set([...prev, testId]))
+    try {
+      await analyzeTest(courseId, testId)
+      loadMaterials()
+    } catch (err) {
+      setAnalyzeError(err.response?.data?.detail || 'Analysis failed. Please try again.')
+    } finally {
+      setAnalyzingTestIds((prev) => {
+        const next = new Set(prev)
+        next.delete(testId)
+        return next
+      })
+    }
+  }
 
   const handleRenameFileSave = async () => {
     if (!renamingFileId || !(renamingFileValue || '').trim()) {
@@ -1170,6 +1216,9 @@ export default function EditCourse() {
         ) : (
           <DndContext onDragEnd={handleDragEnd}>
             <div className="test-block-grid" style={{ marginBottom: 16 }}>
+              {analyzeError && (
+                <div className="error-msg" style={{ marginBottom: 12 }}>{analyzeError}</div>
+              )}
               {(materials.tests || []).map((test) => (
                 <TestBlockSlot key={test.id} testId={test.id}>
                   <TestBlockCard
@@ -1183,6 +1232,10 @@ export default function EditCourse() {
                     onDelete={handleDeleteSection}
                     onDeleteAttachment={handleDeleteAttachment}
                     isUncategorized={false}
+                    isAnalyzed={!!test.is_analyzed}
+                    analysisSummary={test.analysis_summary ?? null}
+                    isAnalyzing={analyzingTestIds.has(test.id)}
+                    onAnalyze={handleAnalyze}
                   />
                 </TestBlockSlot>
               ))}

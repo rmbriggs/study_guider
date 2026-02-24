@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ProfessorResponse(BaseModel):
@@ -72,6 +72,8 @@ class CourseTestResponse(BaseModel):
     course_id: int
     name: str
     sort_order: int
+    is_analyzed: bool = False
+    analysis_summary: str | None = None
 
     class Config:
         from_attributes = True
@@ -111,3 +113,16 @@ class AttachmentUpdate(BaseModel):
     test_ids: list[int] | None = None
     file_name: str | None = None
     allow_multiple_blocks: bool | None = None
+
+
+class CourseTestAnalysisResponse(BaseModel):
+    id: int
+    test_id: int
+    topic_frequency: dict | None = None
+    conversion_patterns: dict | None = None
+    question_formats: dict | None = None
+    high_signal_handouts: list | None = None
+    summary: str | None = None
+    analyzed_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

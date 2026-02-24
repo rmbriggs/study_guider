@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db import Base
@@ -12,6 +12,7 @@ class Professor(Base):
     name = Column(String(255), nullable=False)
     specialties = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
+    analysis_profile = Column(JSON, nullable=True)
 
     user = relationship("User", backref="professors")
     courses = relationship("Course", back_populates="professor")
@@ -52,6 +53,7 @@ class CourseTest(Base):
     course = relationship("Course", back_populates="tests")
     attachments = relationship("CourseAttachment", back_populates="test")
     attachment_links = relationship("CourseAttachmentTest", back_populates="test", cascade="all, delete-orphan")
+    analysis = relationship("CourseTestAnalysis", back_populates="test", uselist=False, cascade="all, delete-orphan")
 
 
 class CourseAttachmentTest(Base):
@@ -79,3 +81,18 @@ class CourseAttachment(Base):
     course = relationship("Course", back_populates="attachments")
     test = relationship("CourseTest", back_populates="attachments")
     test_links = relationship("CourseAttachmentTest", back_populates="attachment", cascade="all, delete-orphan")
+
+
+class CourseTestAnalysis(Base):
+    __tablename__ = "course_test_analyses"
+
+    id = Column(Integer, primary_key=True)
+    test_id = Column(Integer, ForeignKey("course_tests.id"), unique=True, nullable=False)
+    topic_frequency = Column(JSON, nullable=True)
+    conversion_patterns = Column(JSON, nullable=True)
+    question_formats = Column(JSON, nullable=True)
+    high_signal_handouts = Column(JSON, nullable=True)
+    summary = Column(Text, nullable=True)
+    analyzed_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    test = relationship("CourseTest", back_populates="analysis")

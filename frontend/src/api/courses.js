@@ -124,3 +124,13 @@ export async function addCourseFiles(courseId, formData) {
   })
   return data
 }
+
+export async function analyzeTest(courseId, testId) {
+  const { data } = await api.post(`/courses/${courseId}/tests/${testId}/analyze`)
+  return data
+}
+
+export async function getTestAnalysis(courseId, testId) {
+  const { data } = await api.get(`/courses/${courseId}/tests/${testId}/analysis`)
+  return data
+}
