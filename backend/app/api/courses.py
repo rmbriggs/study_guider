@@ -1,3 +1,4 @@
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -492,6 +493,15 @@ def get_syllabus_file(
     return FileResponse(path, filename=filename, media_type="application/octet-stream")
 
 
+def _sanitize_filename(filename: str) -> str:
+    """Strip path separators and Windows-invalid characters from a filename."""
+    # Strip any path separators so only the base name remains
+    filename = filename.replace("\\", "/").split("/")[-1]
+    # Replace characters invalid on Windows filesystems
+    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', filename)
+    return filename.strip() or "file"
+
+
 @router.post("/{course_id}/files")
 async def add_course_files(
     course_id: int,
@@ -520,22 +530,40 @@ async def add_course_files(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Maximum {MAX_COURSE_FILES} total files per course. You have {existing_count}, adding {len(all_extra)} would exceed the limit.",
         )
-    course_upload_dir = _ensure_upload_dir(COURSE_FILES_SUBDIR)
+    try:
+        course_upload_dir = _ensure_upload_dir(COURSE_FILES_SUBDIR)
+    except OSError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not create upload directory: {e}",
+        )
     max_order = db.query(CourseTest).filter(CourseTest.course_id == course_id).count()
     sort_order = max_order
+    added = 0
+    skipped_ext: list[str] = []
+    skipped_size: list[str] = []
     for upload_file, kind in all_extra:
         ext = Path(upload_file.filename).suffix.lstrip(".").lower()
         if ext not in ALLOWED:
+            skipped_ext.append(upload_file.filename)
             continue
         content = await upload_file.read()
         if len(content) > MAX_SIZE:
+            skipped_size.append(upload_file.filename)
             continue
-        safe_name = f"{uuid.uuid4().hex}_{upload_file.filename}"[:200]
+        clean_name = _sanitize_filename(upload_file.filename)
+        safe_name = f"{uuid.uuid4().hex}_{clean_name}"[:200]
         path = course_upload_dir / safe_name
-        path.write_bytes(content)
+        try:
+            path.write_bytes(content)
+        except OSError as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Could not save file '{upload_file.filename}': {e}",
+            )
         test_id = None
         if kind == CourseAttachmentType.PAST_TEST:
-            section_name = (Path(upload_file.filename).stem or "Past test").strip()[:255]
+            section_name = (Path(clean_name).stem or "Past test").strip()[:255]
             course_test = CourseTest(
                 course_id=course.id,
                 name=section_name or "Past test",
@@ -557,8 +585,23 @@ async def add_course_files(
         db.flush()
         if test_id is not None:
             db.add(CourseAttachmentTest(attachment_id=att.id, test_id=test_id))
+        added += 1
     db.commit()
-    return {"ok": True, "added": len(all_extra)}
+    result: dict = {"ok": True, "added": added}
+    if skipped_ext:
+        result["skipped_unsupported"] = skipped_ext
+    if skipped_size:
+        result["skipped_too_large"] = skipped_size
+    if added == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"No files were saved. "
+                + (f"Unsupported type: {', '.join(skipped_ext)}. " if skipped_ext else "")
+                + (f"Too large (>{settings.max_file_size_mb} MB): {', '.join(skipped_size)}." if skipped_size else "")
+            ).strip(),
+        )
+    return result
 
 
 @router.get("", response_model=list[CourseListItem])
@@ -662,9 +705,16 @@ async def _save_upload(f: UploadFile, upload_dir: Path) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File {f.filename} exceeds {settings.max_file_size_mb} MB",
         )
-    safe_name = f"{uuid.uuid4().hex}_{f.filename}"[:200]
+    clean_name = _sanitize_filename(f.filename or "file")
+    safe_name = f"{uuid.uuid4().hex}_{clean_name}"[:200]
     path = upload_dir / safe_name
-    path.write_bytes(content)
+    try:
+        path.write_bytes(content)
+    except OSError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not save file '{f.filename}': {e}",
+        )
     return str(path)
 
 
@@ -736,12 +786,13 @@ async def create_course(
         content = await upload_file.read()
         if len(content) > MAX_SIZE:
             continue
-        safe_name = f"{uuid.uuid4().hex}_{upload_file.filename}"[:200]
+        clean_name = _sanitize_filename(upload_file.filename)
+        safe_name = f"{uuid.uuid4().hex}_{clean_name}"[:200]
         path = course_upload_dir / safe_name
         path.write_bytes(content)
         test_id = None
         if kind == CourseAttachmentType.PAST_TEST:
-            section_name = (Path(upload_file.filename).stem or "Past test").strip()[:255]
+            section_name = (Path(clean_name).stem or "Past test").strip()[:255]
             course_test = CourseTest(
                 course_id=course.id,
                 name=section_name or "Past test",

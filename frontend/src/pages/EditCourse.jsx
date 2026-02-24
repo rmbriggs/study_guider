@@ -757,7 +757,12 @@ export default function EditCourse() {
       loadMaterials()
       getCourse(courseId).then((c) => setSyllabusFilePath(c.syllabus_file_path ?? null))
     } catch (err) {
-      setFilesError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to add files'))
+      const detail = err?.response?.data?.detail
+      if (Array.isArray(detail)) {
+        setFilesError(detail.map((d) => d?.msg ?? String(d)).join('; ') || 'Failed to add files')
+      } else {
+        setFilesError(detail || `Failed to add files (HTTP ${err?.response?.status ?? 'no response'})`)
+      }
     } finally {
       setFilesUploading(false)
     }
