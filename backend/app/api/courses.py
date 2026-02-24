@@ -694,13 +694,21 @@ async def add_course_files(
             file_path=clean_name,
             file_content=content,
             attachment_kind=kind,
+            allow_multiple_blocks=0,
         )
         db.add(att)
         db.flush()
         if test_id is not None:
             db.add(CourseAttachmentTest(attachment_id=att.id, test_id=test_id))
         added += 1
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save files: {e!s}",
+        )
     result: dict = {"ok": True, "added": added}
     if skipped_ext:
         result["skipped_unsupported"] = skipped_ext
@@ -884,8 +892,15 @@ async def create_course(
         personal_description=(personal_description or "").strip() or None,
     )
     db.add(course)
-    db.commit()
-    db.refresh(course)
+    try:
+        db.commit()
+        db.refresh(course)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create course: {e!s}",
+        )
 
     sort_order = 0
     for upload_file, kind in all_extra:
@@ -916,12 +931,20 @@ async def create_course(
             file_path=clean_name,
             file_content=content,
             attachment_kind=kind,
+            allow_multiple_blocks=0,
         )
         db.add(att)
         db.flush()
         if test_id is not None:
             db.add(CourseAttachmentTest(attachment_id=att.id, test_id=test_id))
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save course files: {e!s}",
+        )
     if course.professor:
         db.refresh(course.professor)
     return CourseCreateResponse(

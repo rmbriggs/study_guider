@@ -208,15 +208,18 @@ def extract_text_from_bytes(content: bytes, file_type: str) -> str:
         return ""
     ext = (file_type or "").lower().lstrip(".")
     suffix = f".{ext}" if ext else ""
+    tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(content)
             tmp.flush()
-            return extract_text_from_file(tmp.name, file_type)
+            tmp_path = tmp.name
+        return extract_text_from_file(tmp_path, file_type)
     except Exception:
         return ""
     finally:
-        try:
-            Path(tmp.name).unlink(missing_ok=True)
-        except Exception:
-            pass
+        if tmp_path:
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except Exception:
+                pass

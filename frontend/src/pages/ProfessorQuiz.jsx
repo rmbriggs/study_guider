@@ -14,6 +14,7 @@ export default function ProfessorQuiz() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+  const [savedMessage, setSavedMessage] = useState('')
   const [answers, setAnswers] = useState({})
 
   const loadProfessor = () => {
@@ -70,11 +71,14 @@ export default function ProfessorQuiz() {
 
   const handleSaveAnswers = async () => {
     setError('')
+    setSavedMessage('')
     setSaving(true)
     try {
       const updated = await updateProfessorQuizAnswers(Number(id), answers)
       setProfessor(updated)
       setAnswers(updated.study_guide_quiz?.answers || {})
+      setSavedMessage('Answers saved.')
+      setTimeout(() => setSavedMessage(''), 4000)
     } catch (err) {
       setError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to save answers'))
     } finally {
@@ -197,6 +201,11 @@ export default function ProfessorQuiz() {
                 ))}
               </div>
               {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
+              {savedMessage && (
+                <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14 }}>
+                  {savedMessage}
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <Button variant="accent" onClick={handleSaveAnswers} disabled={saving}>
