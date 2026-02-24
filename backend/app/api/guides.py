@@ -202,6 +202,17 @@ def create_guide_from_block(
                     "specialties": prof.specialties,
                     "description": prof.description,
                 }
+                quiz_data = getattr(prof, "study_guide_quiz", None) or {}
+                qs = quiz_data.get("questions") or []
+                ans = quiz_data.get("answers") or {}
+                if qs and ans:
+                    quiz_qa = [
+                        {"question": next((q.get("text") or "" for q in qs if q.get("id") == qid), ""), "answer": ans.get(qid) or ""}
+                        for qid in [q.get("id") for q in qs if q.get("id")]
+                    ]
+                    quiz_qa = [p for p in quiz_qa if (p.get("answer") or "").strip()]
+                    if quiz_qa:
+                        professor_profile["quiz_qa"] = quiz_qa
 
         api_key = settings.gemini_api_key
         block_analyses = []
@@ -374,6 +385,17 @@ async def create_guide(
                 "specialties": prof.specialties,
                 "description": prof.description,
             }
+            quiz_data = getattr(prof, "study_guide_quiz", None) or {}
+            qs = quiz_data.get("questions") or []
+            ans = quiz_data.get("answers") or {}
+            if qs and ans:
+                quiz_qa = [
+                    {"question": next((q.get("text") or "" for q in qs if q.get("id") == qid), ""), "answer": ans.get(qid) or ""}
+                    for qid in [q.get("id") for q in qs if q.get("id")]
+                ]
+                quiz_qa = [p for p in quiz_qa if (p.get("answer") or "").strip()]
+                if quiz_qa:
+                    professor_profile["quiz_qa"] = quiz_qa
 
     upload_dir = _ensure_upload_dir()
     guide = StudyGuide(

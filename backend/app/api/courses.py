@@ -13,6 +13,7 @@ from app.schemas.courses import (
     ProfessorResponse,
     ProfessorCreate,
     ProfessorUpdate,
+    ProfessorQuizAnswersUpdate,
     CourseListItem,
     CourseResponse,
     CourseCreateResponse,
@@ -110,6 +111,66 @@ def update_professor(
         professor.specialties = (body.specialties or "").strip() or None
     if body.description is not None:
         professor.description = (body.description or "").strip() or None
+    db.commit()
+    db.refresh(professor)
+    return professor
+
+
+@router.post("/professors/{professor_id}/quiz/generate", response_model=ProfessorResponse)
+def generate_professor_quiz(
+    professor_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    professor = db.query(Professor).filter(
+        Professor.id == professor_id,
+        Professor.user_id == current_user.id,
+    ).first()
+    if not professor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professor not found")
+    api_key = getattr(settings, "gemini_api_key", None) or ""
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Study guide quiz generation is not configured (missing API key).",
+        )
+    from app.services.llm_service import generate_professor_quiz_questions
+    try:
+        questions = generate_professor_quiz_questions(
+            professor_name=professor.name or "",
+            specialties=professor.specialties,
+            description=professor.description,
+            api_key=api_key,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    quiz = {"questions": questions, "answers": {}}
+    professor.study_guide_quiz = quiz
+    db.commit()
+    db.refresh(professor)
+    return professor
+
+
+@router.patch("/professors/{professor_id}/quiz/answers", response_model=ProfessorResponse)
+def update_professor_quiz_answers(
+    professor_id: int,
+    body: ProfessorQuizAnswersUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    professor = db.query(Professor).filter(
+        Professor.id == professor_id,
+        Professor.user_id == current_user.id,
+    ).first()
+    if not professor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Professor not found")
+    existing = professor.study_guide_quiz or {}
+    questions = existing.get("questions") or []
+    answers = dict(existing.get("answers") or {})
+    for qid, text in (body.answers or {}).items():
+        if isinstance(text, str) and qid:
+            answers[str(qid).strip()] = text.strip()[:2000]
+    professor.study_guide_quiz = {"questions": questions, "answers": answers}
     db.commit()
     db.refresh(professor)
     return professor

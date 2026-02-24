@@ -19,18 +19,50 @@ class _HTMLTextExtractor(HTMLParser):
         return "\n\n".join(self._parts).strip()
 
 
-def extract_text_from_pdf(file_path: str | Path) -> str:
-    """Extract text from a PDF file. Returns empty string if extraction fails."""
+def _extract_with_pypdf(file_path: Path, use_layout: bool = False) -> str:
+    """Use pypdf to extract text; use_layout=True tries layout mode (helps some PDFs)."""
     try:
         reader = PdfReader(file_path)
         parts = []
         for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                parts.append(text)
+            try:
+                if use_layout:
+                    text = page.extract_text(extraction_mode="layout")
+                else:
+                    text = page.extract_text()
+            except TypeError:
+                text = page.extract_text() if not use_layout else None
+            if text is not None and (t := (text if isinstance(text, str) else "").strip()):
+                parts.append(t)
         return "\n\n".join(parts).strip() if parts else ""
     except Exception:
         return ""
+
+
+def _extract_with_pdfplumber(file_path: Path) -> str:
+    """Use pdfplumber when pypdf returns nothing; often works on PDFs pypdf misses."""
+    try:
+        import pdfplumber
+        parts = []
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text and (t := text.strip()):
+                    parts.append(t)
+        return "\n\n".join(parts).strip() if parts else ""
+    except Exception:
+        return ""
+
+
+def extract_text_from_pdf(file_path: str | Path) -> str:
+    """Extract text from a PDF file. Tries pypdf (default + layout), then pdfplumber. Returns empty if all fail."""
+    path = Path(file_path)
+    out = _extract_with_pypdf(path, use_layout=False)
+    if not out:
+        out = _extract_with_pypdf(path, use_layout=True)
+    if not out:
+        out = _extract_with_pdfplumber(path)
+    return out or ""
 
 
 def _read_text_file(path: Path) -> str:

@@ -20,6 +20,16 @@ export async function updateProfessor(id, body) {
   return data
 }
 
+export async function generateProfessorQuiz(professorId) {
+  const { data } = await api.post(`/courses/professors/${professorId}/quiz/generate`)
+  return data
+}
+
+export async function updateProfessorQuizAnswers(professorId, answers) {
+  const { data } = await api.patch(`/courses/professors/${professorId}/quiz/answers`, { answers })
+  return data
+}
+
 export async function getCourses() {
   const { data } = await api.get('/courses')
   return data

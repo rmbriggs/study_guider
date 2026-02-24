@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Users, Plus } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Users, Plus, ClipboardList } from 'lucide-react'
 import { getProfessors } from '../api/courses'
 import Button from '../components/Button'
 import NewProfessorModal from '../components/NewProfessorModal'
 
 export default function ManageProfessors() {
+  const navigate = useNavigate()
   const [professors, setProfessors] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -65,8 +66,8 @@ export default function ManageProfessors() {
         <div className="animate-in delay-1">
           <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
             {professors.map((p) => (
-              <Link key={p.id} to={`/professors/${p.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <div className="card" style={{ cursor: 'pointer', height: '100%' }}>
+              <div key={p.id} className="card" style={{ height: '100%', position: 'relative' }}>
+                <Link to={`/professors/${p.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
                   <div className="icon-badge ib-purple">
                     <Users size={20} />
                   </div>
@@ -74,8 +75,21 @@ export default function ManageProfessors() {
                   {p.specialties && (
                     <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{p.specialties}</div>
                   )}
-                </div>
-              </Link>
+                </Link>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  style={{ marginTop: 12 }}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    navigate(`/professors/${p.id}/quiz`)
+                  }}
+                >
+                  <ClipboardList size={16} />
+                  Quiz
+                </Button>
+              </div>
             ))}
           </div>
         </div>

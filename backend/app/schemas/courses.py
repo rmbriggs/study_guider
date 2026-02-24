@@ -7,9 +7,14 @@ class ProfessorResponse(BaseModel):
     name: str
     specialties: str | None = None
     description: str | None = None
+    study_guide_quiz: dict | None = None  # { "questions": [{"id":"q1","text":"..."}], "answers": {"q1":"..."} }
 
     class Config:
         from_attributes = True
+
+
+class ProfessorQuizAnswersUpdate(BaseModel):
+    answers: dict[str, str]  # question id -> answer text
 
 
 class ProfessorCreate(BaseModel):

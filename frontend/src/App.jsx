@@ -14,6 +14,7 @@ import ManageCourses from './pages/ManageCourses'
 import ManageProfessors from './pages/ManageProfessors'
 import EditCourse from './pages/EditCourse'
 import EditProfessor from './pages/EditProfessor'
+import ProfessorQuiz from './pages/ProfessorQuiz'
 import Admin from './pages/Admin'
 
 function ProtectedRoute({ children }) {
@@ -122,6 +123,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AppLayout><ManageProfessors /></AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/professors/:id/quiz"
+        element={
+          <ProtectedRoute>
+            <AppLayout><ProfessorQuiz /></AppLayout>
           </ProtectedRoute>
         }
       />

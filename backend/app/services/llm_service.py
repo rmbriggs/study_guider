@@ -144,6 +144,16 @@ def build_system_instruction(
         )
         base += prof_block
 
+    quiz_qa = (professor_profile or {}).get("quiz_qa") if professor_profile else []
+    if quiz_qa:
+        base += "## Student's answers about this professor (use to tailor the study guide):\n"
+        for pair in quiz_qa:
+            q = (pair.get("question") or "").strip()
+            a = (pair.get("answer") or "").strip()
+            if q or a:
+                base += f"Q: {q or '—'}\nA: {a or '—'}\n\n"
+        base += "\n"
+
     if professor_analysis:
         tested_topics = professor_analysis.get("tested_topics") or []
         preferred_formats = professor_analysis.get("preferred_formats") or {}
@@ -279,6 +289,84 @@ def generate_study_guide(
     if not response or not response.text:
         return ("*No response generated.*", GEMINI_MODEL)
     return response.text.strip(), GEMINI_MODEL
+
+
+def generate_professor_quiz_questions(
+    professor_name: str,
+    specialties: str | None,
+    description: str | None,
+    api_key: str,
+) -> list[dict]:
+    """
+    Call Gemini to generate exactly 5 short questions that help tailor a study guide
+    for this professor. Returns list of {"id": "q1", "text": "..."} with ids q1..q5.
+    """
+    try:
+        import json
+        import re
+    except ImportError:
+        pass
+    try:
+        import google.generativeai as genai
+    except ImportError:
+        raise RuntimeError("google-generativeai package not installed")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY is not set")
+
+    system = (
+        "You are a helpful assistant that creates short survey questions for students "
+        "about their professor. Your output will be parsed as JSON. "
+        "Respond with ONLY a valid JSON array of exactly 5 objects. "
+        "Each object must have exactly two keys: \"id\" (string: \"q1\", \"q2\", \"q3\", \"q4\", \"q5\") "
+        "and \"text\" (string: the question, one short sentence). "
+        "No markdown, no code fences, no explanation — only the JSON array."
+    )
+    parts = [f"Professor name: {professor_name or 'Unknown'}."]
+    if specialties and specialties.strip():
+        parts.append(f"Their specialties: {specialties.strip()}.")
+    if description and description.strip():
+        parts.append(f"Additional context: {description.strip()}")
+    parts.append(
+        "Generate exactly 5 questions that help tailor a study guide for this professor. "
+        "Focus on: exam style, what they emphasize, question formats they use, topics they care about, "
+        "or weak areas the student wants to focus on. Keep each question concise and useful for study guide generation."
+    )
+    user_content = " ".join(parts)
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(
+        GEMINI_MODEL,
+        system_instruction=system,
+        generation_config={"max_output_tokens": 1024},
+    )
+    response = model.generate_content(user_content)
+    if not response or not response.text:
+        raise ValueError("No response generated for quiz questions")
+
+    raw = response.text.strip()
+    # Strip markdown code fence if present
+    if "```" in raw:
+        raw = re.sub(r"^```(?:json)?\s*", "", raw)
+        raw = re.sub(r"\s*```\s*$", "", raw)
+    data = json.loads(raw)
+    if not isinstance(data, list):
+        data = [data]
+    # Normalize to q1..q5 with id and text
+    result = []
+    for i, item in enumerate(data[:5]):
+        if isinstance(item, dict):
+            qid = item.get("id") or f"q{i + 1}"
+            text = item.get("text") or str(item.get("question", "")) or f"Question {i + 1}"
+        else:
+            qid = f"q{i + 1}"
+            text = str(item) if item else f"Question {i + 1}"
+        if not qid.startswith("q"):
+            qid = f"q{i + 1}"
+        result.append({"id": qid, "text": text[:500]})
+    # Ensure exactly 5 with ids q1..q5
+    while len(result) < 5:
+        result.append({"id": f"q{len(result) + 1}", "text": f"Question {len(result) + 1}."})
+    return result[:5]
 
 
 # ---------------------------------------------------------------------------

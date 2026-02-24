@@ -13,6 +13,7 @@ class Professor(Base):
     specialties = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     analysis_profile = Column(JSON, nullable=True)
+    study_guide_quiz = Column(JSON, nullable=True)  # { "questions": [{"id":"q1","text":"..."}], "answers": {"q1":"..."} }
 
     user = relationship("User", backref="professors")
     courses = relationship("Course", back_populates="professor")

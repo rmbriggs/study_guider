@@ -106,6 +106,11 @@ export default function EditProfessor() {
               rows={4}
             />
           </div>
+          <div style={{ marginBottom: 20 }}>
+            <Link to={`/professors/${id}/quiz`} style={{ fontSize: 14, color: 'var(--accent)' }}>
+              View / edit study guide quiz
+            </Link>
+          </div>
           {error && <div className="error-msg" style={{ marginBottom: 16 }}>{error}</div>}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <Link to="/professors">
