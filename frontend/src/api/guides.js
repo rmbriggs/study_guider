@@ -19,3 +19,9 @@ export async function createGuide(formData) {
   const { data } = await api.post('/guides', formData)
   return data
 }
+
+/** Create a study guide from a course block's materials (no file upload). */
+export async function createGuideFromBlock(body) {
+  const { data } = await api.post('/guides/from-block', body)
+  return data
+}

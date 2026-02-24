@@ -14,9 +14,8 @@ export default function Navbar() {
         {user && (
           <>
             <Link to="/" className="nav-link">Dashboard</Link>
-            <Link to="/create" className="nav-link">Create Guide</Link>
-            <Link to="/courses" className="nav-link">Manage Courses</Link>
-            <Link to="/professors" className="nav-link">Manage Professors</Link>
+            <Link to="/courses" className="nav-link">Courses</Link>
+            <Link to="/professors" className="nav-link">Professors</Link>
           </>
         )}
       </div>

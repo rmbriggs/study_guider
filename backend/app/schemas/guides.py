@@ -62,3 +62,9 @@ class CreateGuideResponse(BaseModel):
 class GuideOptionsResponse(BaseModel):
     courses: list[str]
     professors: list[str]
+
+
+class CreateGuideFromBlockRequest(BaseModel):
+    course_id: int
+    test_id: int | None = None  # None = uncategorized block
+    title: str | None = None

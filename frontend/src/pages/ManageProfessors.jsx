@@ -32,7 +32,7 @@ export default function ManageProfessors() {
 
   return (
     <div className="animate-in">
-      <h1 className="section-title">Manage Professors</h1>
+      <h1 className="section-title">Professors</h1>
       <p className="section-subtitle">Click a professor to edit their details.</p>
       <div style={{ marginBottom: 24 }}>
         <Button variant="accent" className="btn-accent" onClick={() => setNewProfessorOpen(true)}>

@@ -26,7 +26,7 @@ export default function ManageCourses() {
 
   return (
     <div className="animate-in">
-      <h1 className="section-title">Manage Courses</h1>
+      <h1 className="section-title">Courses</h1>
       <p className="section-subtitle">Click a course to edit its details.</p>
       <div style={{ marginBottom: 24 }}>
         <Button variant="accent" className="btn-accent" onClick={() => setNewCourseOpen(true)}>
@@ -52,7 +52,7 @@ export default function ManageCourses() {
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>No courses yet</h2>
           <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-            Add courses when creating a study guide, or from the Create Guide page.
+            Add courses here, then add materials to a block and generate study guides from the course page.
           </p>
         </div>
       )}

@@ -8,7 +8,6 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyEmail from './pages/VerifyEmail'
 import Dashboard from './pages/Dashboard'
-import CreateGuide from './pages/CreateGuide'
 import GuideView from './pages/GuideView'
 import Settings from './pages/Settings'
 import ManageCourses from './pages/ManageCourses'
@@ -83,14 +82,6 @@ export default function App() {
         element={
           <ProtectedRoute>
             <AppLayout><Dashboard /></AppLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/create"
-        element={
-          <ProtectedRoute>
-            <AppLayout><CreateGuide /></AppLayout>
           </ProtectedRoute>
         }
       />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, FileText, BookOpen, FileStack, Pencil, Plus, Download, Upload, Trash2, MoreVertical, GripVertical } from 'lucide-react'
+import { ArrowLeft, FileText, BookOpen, FileStack, Pencil, Plus, Download, Upload, Trash2, MoreVertical, GripVertical, FilePlus } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import {
@@ -20,6 +20,7 @@ import {
   duplicateAttachment,
   analyzeTest,
 } from '../api/courses'
+import { createGuideFromBlock } from '../api/guides'
 import { getApiErrorMessage } from '../utils/apiError'
 import Button from '../components/Button'
 import Input from '../components/Input'
@@ -391,8 +392,10 @@ function TestBlockCard({
   analysisSummary,
   isAnalyzing,
   onAnalyze,
+  onGenerateGuide,
 }) {
   const [moveLoading, setMoveLoading] = useState(null)
+  const [generatingGuide, setGeneratingGuide] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [editNameValue, setEditNameValue] = useState(title)
   const droppableId = testId == null ? 'uncat' : `test-${testId}`
@@ -582,6 +585,25 @@ function TestBlockCard({
           </div>
         )
       })()}
+      {pastTests.length === 0 && (handouts.length > 0 || notes.length > 0) && onGenerateGuide && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--bg-tertiary)' }}>
+          <Button
+            variant="accent"
+            onClick={async () => {
+              setGeneratingGuide(true)
+              try {
+                await onGenerateGuide(courseId, testId)
+              } finally {
+                setGeneratingGuide(false)
+              }
+            }}
+            disabled={generatingGuide}
+          >
+            <FilePlus size={18} />
+            {generatingGuide ? 'Generating…' : 'Generate study guide'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -813,6 +835,16 @@ export default function EditCourse() {
         next.delete(testId)
         return next
       })
+    }
+  }
+
+  const handleGenerateGuide = async (courseId, testId) => {
+    setAnalyzeError('')
+    try {
+      const data = await createGuideFromBlock({ course_id: courseId, test_id: testId })
+      navigate(`/guide/${data.id}`)
+    } catch (err) {
+      setAnalyzeError(err.response?.data?.detail || getApiErrorMessage(err, 'Failed to generate study guide'))
     }
   }
 
@@ -1206,6 +1238,7 @@ export default function EditCourse() {
                   analysisSummary={test.analysis_summary ?? null}
                   isAnalyzing={analyzingTestIds.has(test.id)}
                   onAnalyze={handleAnalyze}
+                  onGenerateGuide={handleGenerateGuide}
                 />
               ))}
             </div>
@@ -1220,6 +1253,7 @@ export default function EditCourse() {
               onRename={() => {}}
               onDeleteAttachment={handleDeleteAttachment}
               isUncategorized
+              onGenerateGuide={handleGenerateGuide}
             />
           </DndContext>
         )}
