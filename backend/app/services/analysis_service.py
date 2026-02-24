@@ -15,7 +15,7 @@ from app.models.course import (
     Professor,
     CourseAttachmentType,
 )
-from app.services.file_parser import extract_text_from_file
+from app.services.file_parser import extract_text_from_file, _resolve_file_path
 
 ANALYSIS_MODEL = "gemini-2.5-flash"
 _MAX_CHARS_PER_FILE = 10_000
@@ -51,14 +51,19 @@ def analyze_test_block(test_id: int, db: Session, api_key: str) -> CourseTestAna
     if not handout_atts:
         raise ValueError("No handouts or notes in this block — add handout/note files before analyzing")
 
-    PLACEHOLDER = "(no text extracted)"
+    _MISSING = "(file not found — please re-upload)"
+    _NO_TEXT = "(no text extracted — possibly scanned/image PDF)"
     extracted: list[tuple[CourseAttachment, str]] = []
 
     def get_text(att: CourseAttachment) -> str:
-        text = extract_text_from_file(att.file_path, att.file_type) or ""
-        if len(text) > _MAX_CHARS_PER_FILE:
-            text = text[:_MAX_CHARS_PER_FILE] + "\n\n*[truncated]*"
-        out = text or PLACEHOLDER
+        resolved = _resolve_file_path(att.file_path)
+        if not resolved.exists():
+            out = _MISSING
+        else:
+            text = extract_text_from_file(att.file_path, att.file_type) or ""
+            if len(text) > _MAX_CHARS_PER_FILE:
+                text = text[:_MAX_CHARS_PER_FILE] + "\n\n*[truncated]*"
+            out = text or _NO_TEXT
         extracted.append((att, out))
         return out
 
@@ -70,15 +75,25 @@ def analyze_test_block(test_id: int, db: Session, api_key: str) -> CourseTestAna
     for att in past_test_atts:
         test_section += f"### {att.file_name}\n{get_text(att)}\n\n"
 
-    # Fail fast with a clear error if no file produced real text (path/format/OCR issue)
-    failed = [att.file_name for att, text in extracted if text == PLACEHOLDER]
-    if failed:
+    # Only fail if we have NO useful text from at least one side of the analysis
+    def _has_text(text: str) -> bool:
+        return text not in (_MISSING, _NO_TEXT)
+
+    past_test_ok = any(_has_text(t) for a, t in extracted if a.attachment_kind == CourseAttachmentType.PAST_TEST)
+    handout_ok = any(_has_text(t) for a, t in extracted if a.attachment_kind in (CourseAttachmentType.HANDOUT, CourseAttachmentType.NOTE))
+
+    if not past_test_ok or not handout_ok:
+        missing_names = [a.file_name for a, t in extracted if t == _MISSING]
+        no_text_names = [a.file_name for a, t in extracted if t == _NO_TEXT]
+        parts = []
+        if missing_names:
+            parts.append(f"File(s) not found on server (try re-uploading): {', '.join(missing_names)}")
+        if no_text_names:
+            parts.append(f"File(s) with no extractable text — may be scanned/image PDF: {', '.join(no_text_names)}")
+        side = "past test" if not past_test_ok else "handout/note"
         raise ValueError(
-            "No text could be extracted from the attached files. "
-            "Files that failed: " + ", ".join(failed) + ". "
-            "Check that (1) files exist at the paths used by the server, "
-            "(2) file types are supported for extraction (PDF, TXT, MD, DOCX, RTF, ODT, HTML), "
-            "and (3) PDFs contain selectable text (image-only/scanned PDFs need OCR)."
+            f"Could not extract content from the {side} file(s). "
+            + (" | ".join(parts) if parts else "Check that files are text-based PDFs (not scanned).")
         )
 
     prompt = (

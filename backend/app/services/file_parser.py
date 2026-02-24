@@ -1,4 +1,5 @@
 from html.parser import HTMLParser
+from io import BytesIO
 from pathlib import Path
 from pypdf import PdfReader
 
@@ -22,7 +23,9 @@ class _HTMLTextExtractor(HTMLParser):
 def _extract_with_pypdf(file_path: Path, use_layout: bool = False) -> str:
     """Use pypdf to extract text; use_layout=True tries layout mode (helps some PDFs)."""
     try:
-        reader = PdfReader(file_path)
+        # Read bytes first so cloud-synced files (e.g. OneDrive) are fully materialized
+        raw = file_path.read_bytes()
+        reader = PdfReader(BytesIO(raw))
         parts = []
         for page in reader.pages:
             try:
@@ -43,8 +46,10 @@ def _extract_with_pdfplumber(file_path: Path) -> str:
     """Use pdfplumber when pypdf returns nothing; often works on PDFs pypdf misses."""
     try:
         import pdfplumber
+        from io import BytesIO as _BytesIO
         parts = []
-        with pdfplumber.open(file_path) as pdf:
+        raw = file_path.read_bytes()
+        with pdfplumber.open(_BytesIO(raw)) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
                 if text and (t := text.strip()):
