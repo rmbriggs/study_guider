@@ -9,6 +9,9 @@ Modular design: edit MATERIAL_INSTRUCTIONS[type] or the block constants below to
 how Gemini treats any individual material type without touching the rest of the prompt.
 """
 
+import json
+import re
+
 from app.services.text_sanitizer import sanitize_text_for_gemini
 
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -304,11 +307,6 @@ def generate_professor_quiz_questions(
     for this professor. Returns list of {"id": "q1", "text": "...", "options": ["A", "B", "C", "D"]}.
     """
     try:
-        import json
-        import re
-    except ImportError:
-        pass
-    try:
         import google.generativeai as genai
     except ImportError:
         raise RuntimeError("google-generativeai package not installed")
@@ -341,7 +339,7 @@ def generate_professor_quiz_questions(
     model = genai.GenerativeModel(
         GEMINI_MODEL,
         system_instruction=system,
-        generation_config={"max_output_tokens": 1024},
+        generation_config={"max_output_tokens": 2048},
     )
     response = model.generate_content(user_content)
     if not response or not response.text:
@@ -351,7 +349,11 @@ def generate_professor_quiz_questions(
     if "```" in raw:
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
         raw = re.sub(r"\s*```\s*$", "", raw)
-    data = json.loads(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        # Response may be truncated (unterminated string) or malformed; try to repair and reparse
+        data = _repair_quiz_json(raw, is_unterminated_string="Unterminated string" in str(e) or " Unterminated" in str(e))
     if not isinstance(data, list):
         data = [data]
     result = []
@@ -384,6 +386,28 @@ def generate_professor_quiz_questions(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+def _repair_quiz_json(raw: str, is_unterminated_string: bool = True) -> list:
+    """Attempt to repair truncated or malformed JSON from the LLM. Returns a list of question dicts."""
+    repaired = raw.rstrip()
+    if repaired.endswith("\\"):
+        repaired = repaired[:-1]
+    # Only close an open string when the parse error indicated unterminated string
+    if is_unterminated_string and repaired and not repaired.endswith('"') and not repaired.endswith("}"):
+        repaired += '"'
+    # Balance brackets: add } and ] as needed
+    open_braces = repaired.count("{") - repaired.count("}")
+    open_brackets = repaired.count("[") - repaired.count("]")
+    repaired = repaired.rstrip()
+    while repaired.endswith(","):
+        repaired = repaired[:-1].rstrip()
+    repaired += "}" * max(0, open_braces) + "]" * max(0, open_brackets)
+    try:
+        out = json.loads(repaired)
+        return out if isinstance(out, list) else [out]
+    except json.JSONDecodeError:
+        return []
+
 
 def _truncate_text(text: str, max_chars: int) -> str:
     """Truncate text to max_chars, breaking on a newline boundary where possible."""

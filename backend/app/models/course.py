@@ -1,5 +1,5 @@
 from sqlalchemy import Boolean, Column, Integer, String, Text, DateTime, ForeignKey, JSON, LargeBinary
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import deferred, relationship
 from sqlalchemy.sql import func
 from app.db import Base
 
@@ -34,7 +34,7 @@ class Course(Base):
     nickname = Column(String(255), nullable=False)
     professor_id = Column(Integer, ForeignKey("professors.id"), nullable=True)
     syllabus_file_path = Column(String(512), nullable=True)  # filename for download when syllabus in DB
-    syllabus_file_data = Column(LargeBinary, nullable=True)  # file bytes when stored in DB (e.g. Railway)
+    syllabus_file_data = deferred(Column(LargeBinary, nullable=True))  # file bytes when stored in DB (e.g. Railway)
     personal_description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -77,7 +77,7 @@ class CourseAttachment(Base):
     file_name = Column(String(255), nullable=False)
     file_type = Column(String(64), nullable=False)  # pdf, txt
     file_path = Column(String(512), nullable=False)  # legacy path or filename when stored in DB
-    file_content = Column(LargeBinary, nullable=True)  # file bytes when stored in DB (e.g. Railway)
+    file_content = deferred(Column(LargeBinary, nullable=True))  # file bytes when stored in DB (e.g. Railway)
     attachment_kind = Column(String(32), nullable=False)  # handout, past_test, note
     allow_multiple_blocks = Column(Integer, nullable=False, default=0)  # 0=false, 1=true (DB is integer)
 
