@@ -575,11 +575,11 @@ function TestBlockCard({
       />
       {!isUncategorized && (() => {
         const canAnalyze = pastTests.length > 0 && (handouts.length > 0 || notes.length > 0)
-        if (!canAnalyze && !isAnalyzed) return null
+        if (!canAnalyze) return null
         return (
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--bg-tertiary)' }}>
-            {isAnalyzed ? (
-              <div>
+            {isAnalyzed && (
+              <div style={{ marginBottom: 10 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--green-bold)' }}>Analyzed ✓</span>
                 {analysisSummary && (
                   <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4, marginBottom: 0 }}>
@@ -587,11 +587,10 @@ function TestBlockCard({
                   </p>
                 )}
               </div>
-            ) : (
-              <Button variant="secondary" onClick={() => onAnalyze(testId)} disabled={isAnalyzing}>
-                {isAnalyzing ? 'Analyzing…' : 'Analyze block'}
-              </Button>
             )}
+            <Button variant="secondary" onClick={() => onAnalyze(testId)} disabled={isAnalyzing}>
+              {isAnalyzing ? 'Analyzing…' : isAnalyzed ? 'Re-analyze block' : 'Analyze block'}
+            </Button>
           </div>
         )
       })()}

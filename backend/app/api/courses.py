@@ -322,6 +322,10 @@ def update_attachment(
     if body.allow_multiple_blocks is not None:
         att.allow_multiple_blocks = 1 if body.allow_multiple_blocks else 0
 
+    # When assignment to blocks changes, clear analysis for affected blocks so they are reanalyzed.
+    old_link_rows = db.query(CourseAttachmentTest).filter(CourseAttachmentTest.attachment_id == att.id).all()
+    old_test_ids = {r.test_id for r in old_link_rows}
+
     def set_attachment_test_ids(test_ids: list[int]):
         unique: list[int] = []
         seen: set[int] = set()
@@ -345,6 +349,12 @@ def update_attachment(
 
         # Keep legacy column aligned for now (first assigned test).
         att.test_id = unique[0] if unique else None
+
+        # Clear analysis for any block that gained or lost this file so the block is reanalyzed.
+        new_test_ids = set(unique)
+        affected_test_ids = old_test_ids | new_test_ids
+        if affected_test_ids:
+            db.query(CourseTestAnalysis).filter(CourseTestAnalysis.test_id.in_(affected_test_ids)).delete(synchronize_session=False)
 
     if body.test_ids is not None:
         set_attachment_test_ids(body.test_ids or [])
@@ -432,6 +442,11 @@ def delete_attachment(
     ).first()
     if not att:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+    # Clear analysis for every block that contained this file so those blocks are reanalyzed.
+    link_rows = db.query(CourseAttachmentTest).filter(CourseAttachmentTest.attachment_id == att.id).all()
+    affected_test_ids = [r.test_id for r in link_rows]
+    if affected_test_ids:
+        db.query(CourseTestAnalysis).filter(CourseTestAnalysis.test_id.in_(affected_test_ids)).delete(synchronize_session=False)
     path = Path(att.file_path)
     if path.is_file():
         path.unlink()
