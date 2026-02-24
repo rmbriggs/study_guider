@@ -155,7 +155,7 @@ def get_course_materials(
         if not ids and a.test_id is not None:
             ids.add(a.test_id)
         base["test_ids"] = sorted(ids)
-        base["allow_multiple_blocks"] = getattr(a, "allow_multiple_blocks", False)
+        base["allow_multiple_blocks"] = bool(getattr(a, "allow_multiple_blocks", 0))
         attachment_models.append(CourseAttachmentResponse(**base))
 
     # Fetch analyses for all test IDs in one query
@@ -320,7 +320,7 @@ def update_attachment(
         att.file_name = name[:255]
 
     if body.allow_multiple_blocks is not None:
-        att.allow_multiple_blocks = body.allow_multiple_blocks
+        att.allow_multiple_blocks = 1 if body.allow_multiple_blocks else 0
 
     def set_attachment_test_ids(test_ids: list[int]):
         unique: list[int] = []
@@ -403,7 +403,7 @@ def duplicate_attachment(
         file_type=att.file_type,
         file_path=str(new_path),
         attachment_kind=att.attachment_kind,
-        allow_multiple_blocks=False,
+        allow_multiple_blocks=0,
     )
     db.add(new_att)
     db.flush()

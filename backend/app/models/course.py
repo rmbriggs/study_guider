@@ -76,7 +76,7 @@ class CourseAttachment(Base):
     file_type = Column(String(64), nullable=False)  # pdf, txt
     file_path = Column(String(512), nullable=False)
     attachment_kind = Column(String(32), nullable=False)  # handout, past_test, note
-    allow_multiple_blocks = Column(Boolean, nullable=False, default=False)
+    allow_multiple_blocks = Column(Integer, nullable=False, default=0)  # 0=false, 1=true (DB is integer)
 
     course = relationship("Course", back_populates="attachments")
     test = relationship("CourseTest", back_populates="attachments")
