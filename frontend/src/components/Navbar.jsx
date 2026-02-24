@@ -6,14 +6,14 @@ export default function Navbar() {
 
   return (
     <nav className="navbar">
-      <Link to="/" className="nav-logo">
+      <Link to={user ? '/dashboard' : '/'} className="nav-logo">
         <img src="/logo.png" alt="CourseMind" className="nav-logo-img" />
         CourseMind
       </Link>
       <div className="nav-links">
         {user && (
           <>
-            <Link to="/" className="nav-link">Dashboard</Link>
+            <Link to="/dashboard" className="nav-link">Dashboard</Link>
             <Link to="/courses" className="nav-link">Courses</Link>
             <Link to="/professors" className="nav-link">Professors</Link>
           </>

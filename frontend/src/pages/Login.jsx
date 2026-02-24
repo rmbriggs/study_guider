@@ -28,7 +28,7 @@ export default function Login() {
     try {
       const data = await apiLogin(email, password, staySignedIn)
       login(data.user)
-      navigate('/')
+      navigate('/dashboard')
     } catch (err) {
       setError(getApiErrorMessage(err, 'Login failed. Make sure the backend is running (port 8000). See README for how to start it.'))
     } finally {

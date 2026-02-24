@@ -19,7 +19,7 @@ export default function Sidebar() {
         <div className="sidebar-section">
           <div className="sidebar-label">Overview</div>
           <NavLink
-            to="/"
+            to="/dashboard"
             className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
           >
             <div className="sidebar-icon ib-blue">
@@ -31,7 +31,7 @@ export default function Sidebar() {
         <div className="sidebar-section">
           <div className="sidebar-label">Study</div>
           <NavLink
-            to="/"
+            to="/dashboard"
             className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
           >
             <div className="sidebar-icon ib-green">

@@ -37,7 +37,7 @@ export default function GuideView() {
   return (
     <>
       <div className="animate-in" style={{ marginBottom: 24 }}>
-        <Link to="/" className="btn btn-ghost" style={{ display: 'inline-flex', marginBottom: 16, textDecoration: 'none', color: 'inherit' }}>
+        <Link to="/dashboard" className="btn btn-ghost" style={{ display: 'inline-flex', marginBottom: 16, textDecoration: 'none', color: 'inherit' }}>
           <ArrowLeft size={18} />
           Back to Dashboard
         </Link>

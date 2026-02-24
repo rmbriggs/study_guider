@@ -7,6 +7,7 @@ import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyEmail from './pages/VerifyEmail'
+import Landing from './pages/Landing'
 import Dashboard from './pages/Dashboard'
 import GuideView from './pages/GuideView'
 import Settings from './pages/Settings'
@@ -39,7 +40,7 @@ function PublicOnlyRoute({ children }) {
       </div>
     )
   }
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/dashboard" replace />
   return children
 }
 
@@ -53,8 +54,21 @@ function AdminRoute({ children }) {
     )
   }
   if (!user) return <Navigate to="/login" replace />
-  if (!user.is_admin) return <Navigate to="/" replace />
+  if (!user.is_admin) return <Navigate to="/dashboard" replace />
   return children
+}
+
+function LandingOrDashboard() {
+  const { user, loading } = useAuth()
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading…</p>
+      </div>
+    )
+  }
+  if (user) return <Navigate to="/dashboard" replace />
+  return <Landing />
 }
 
 function AppLayout({ children }) {
@@ -80,6 +94,10 @@ export default function App() {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route
         path="/"
+        element={<LandingOrDashboard />}
+      />
+      <Route
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <AppLayout><Dashboard /></AppLayout>

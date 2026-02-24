@@ -134,7 +134,7 @@ export default function VerifyEmail() {
           </button>
         </p>
         <p style={{ marginTop: 20, fontSize: 14, color: 'var(--text-secondary)' }}>
-          <Link to="/" style={{ color: 'var(--blue-bold)' }}>Back to dashboard</Link>
+          <Link to="/dashboard" style={{ color: 'var(--blue-bold)' }}>Back to dashboard</Link>
         </p>
       </div>
     </div>
