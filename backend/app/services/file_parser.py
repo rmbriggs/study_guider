@@ -109,9 +109,24 @@ def extract_text_from_html(file_path: str | Path) -> str:
         return ""
 
 
+def _resolve_file_path(file_path: str | Path) -> Path:
+    """Resolve to an existing file; try cwd and then backend-relative for relative paths."""
+    path = Path(file_path)
+    if path.exists():
+        return path
+    if path.is_absolute():
+        return path
+    # Relative path: try current working directory, then backend root (for when server runs from project root)
+    for base in (Path.cwd(), Path(__file__).resolve().parent.parent):
+        candidate = (base / file_path).resolve()
+        if candidate.exists():
+            return candidate
+    return path
+
+
 def extract_text_from_file(file_path: str | Path, file_type: str) -> str:
     """Extract text based on file type. PDF, txt, md, docx, rtf, odt, html supported for extraction."""
-    path = Path(file_path)
+    path = _resolve_file_path(file_path)
     if not path.exists():
         return ""
     ext = (file_type or path.suffix or "").lower().lstrip(".")

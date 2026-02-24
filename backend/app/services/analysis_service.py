@@ -51,11 +51,16 @@ def analyze_test_block(test_id: int, db: Session, api_key: str) -> CourseTestAna
     if not handout_atts:
         raise ValueError("No handouts or notes in this block — add handout/note files before analyzing")
 
+    PLACEHOLDER = "(no text extracted)"
+    extracted: list[tuple[CourseAttachment, str]] = []
+
     def get_text(att: CourseAttachment) -> str:
         text = extract_text_from_file(att.file_path, att.file_type) or ""
         if len(text) > _MAX_CHARS_PER_FILE:
             text = text[:_MAX_CHARS_PER_FILE] + "\n\n*[truncated]*"
-        return text or "(no text extracted)"
+        out = text or PLACEHOLDER
+        extracted.append((att, out))
+        return out
 
     handout_section = ""
     for att in handout_atts:
@@ -64,6 +69,17 @@ def analyze_test_block(test_id: int, db: Session, api_key: str) -> CourseTestAna
     test_section = ""
     for att in past_test_atts:
         test_section += f"### {att.file_name}\n{get_text(att)}\n\n"
+
+    # Fail fast with a clear error if no file produced real text (path/format/OCR issue)
+    failed = [att.file_name for att, text in extracted if text == PLACEHOLDER]
+    if failed:
+        raise ValueError(
+            "No text could be extracted from the attached files. "
+            "Files that failed: " + ", ".join(failed) + ". "
+            "Check that (1) files exist at the paths used by the server, "
+            "(2) file types are supported for extraction (PDF, TXT, MD, DOCX, RTF, ODT, HTML), "
+            "and (3) PDFs contain selectable text (image-only/scanned PDFs need OCR)."
+        )
 
     prompt = (
         "## Handout/Note Materials\n"

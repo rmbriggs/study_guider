@@ -380,6 +380,7 @@ function KindSection({
 function TestBlockCard({
   title,
   testId,
+  test,
   attachments,
   allSections,
   courseId,
@@ -400,6 +401,13 @@ function TestBlockCard({
   const [editNameValue, setEditNameValue] = useState(title)
   const droppableId = testId == null ? 'uncat' : `test-${testId}`
   const { setNodeRef, isOver } = useDroppable({ id: droppableId })
+  const draggableId = testId != null ? `block-${testId}` : null
+  const { attributes, listeners, setNodeRef: setDraggableRef, transform, isDragging } = useDraggable({
+    id: draggableId ?? 'block-uncat',
+    data: testId != null ? { type: 'block', testId, test } : null,
+    disabled: isUncategorized,
+  })
+  const blockDragStyle = isUncategorized ? {} : { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.7 : 1 }
 
   const sectionNameById = Object.fromEntries((allSections || []).filter((s) => s?.id != null).map((s) => [s.id, s.name]))
 
@@ -459,16 +467,8 @@ function TestBlockCard({
   const handouts = (attachments || []).filter((a) => a.attachment_kind === 'handout')
   const notes = (attachments || []).filter((a) => a.attachment_kind === 'note')
 
-  return (
-    <div
-      ref={setNodeRef}
-      className="card card-static"
-      style={{
-        outline: isOver ? '2px solid var(--blue-bold)' : 'none',
-        outlineOffset: 2,
-        overflow: 'hidden',
-      }}
-    >
+  const cardContent = (
+    <>
       <div
         style={{
           display: 'flex',
@@ -479,6 +479,16 @@ function TestBlockCard({
           ...(isUncategorized ? {} : { padding: '10px 12px', margin: '-10px -12px 6px -12px', backgroundColor: 'var(--bg-tertiary)', borderRadius: 8 }),
         }}
       >
+        {!isUncategorized && (
+          <div
+            {...attributes}
+            {...listeners}
+            style={{ cursor: 'grab', touchAction: 'none', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+            aria-label="Drag to reorder block"
+          >
+            <GripVertical size={18} />
+          </div>
+        )}
         {isUncategorized ? (
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h3>
         ) : editingName ? (
@@ -604,6 +614,27 @@ function TestBlockCard({
           </Button>
         </div>
       )}
+    </>
+  )
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        outline: isOver ? '2px solid var(--blue-bold)' : 'none',
+        outlineOffset: 2,
+      }}
+    >
+      <div
+        ref={isUncategorized ? undefined : setDraggableRef}
+        className="card card-static"
+        style={{
+          overflow: 'hidden',
+          ...blockDragStyle,
+        }}
+      >
+        {cardContent}
+      </div>
     </div>
   )
 }
@@ -727,7 +758,31 @@ export default function EditCourse() {
     if (!over) return
     const overId = String(over.id)
 
-    const { attachment, fromTestId } = active.data?.current || {}
+    const dragData = active.data?.current || {}
+
+    if (dragData.type === 'block') {
+      const dragTestId = dragData.testId
+      if (dragTestId == null) return
+      if (!overId.startsWith('test-')) return
+      const targetTestId = Number(overId.slice('test-'.length))
+      if (Number.isNaN(targetTestId) || dragTestId === targetTestId) return
+      const tests = materials.tests || []
+      const fromIdx = tests.findIndex((t) => t.id === dragTestId)
+      const toIdx = tests.findIndex((t) => t.id === targetTestId)
+      if (fromIdx === -1 || toIdx === -1) return
+      const reordered = [...tests]
+      const [removed] = reordered.splice(fromIdx, 1)
+      reordered.splice(toIdx, 0, removed)
+      try {
+        await Promise.all(
+          reordered.map((t, i) => updateTest(Number(id), t.id, { sort_order: i }))
+        )
+        loadMaterials()
+      } catch (_) {}
+      return
+    }
+
+    const { attachment, fromTestId } = dragData
     if (!attachment) return
 
     let targetTestId = null
@@ -1226,6 +1281,7 @@ export default function EditCourse() {
                   key={test.id}
                   title={test.name}
                   testId={test.id}
+                  test={test}
                   attachments={(materials.attachments || []).filter((a) => getAttachmentTestIds(a).includes(test.id))}
                   allSections={[{ id: null, name: 'Uncategorized' }, ...(materials.tests || [])]}
                   courseId={courseId}

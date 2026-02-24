@@ -39,7 +39,7 @@ MAX_COURSE_FILES = 10
 def _ensure_upload_dir(subdir: str = SYLLABUS_SUBDIR):
     path = Path(settings.upload_dir) / subdir
     path.mkdir(parents=True, exist_ok=True)
-    return path
+    return path.resolve()
 
 
 # ---- Professors ----
