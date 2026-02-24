@@ -134,7 +134,7 @@ function AttachmentRow({
       >
         <Icon size={15} />
       </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 80 }}>
         {editingName ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <input
